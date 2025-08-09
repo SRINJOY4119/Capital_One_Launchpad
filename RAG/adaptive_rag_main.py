@@ -48,7 +48,7 @@ def main():
 
     start = time.time()
 
-    question = "What is the main argument of the paper?"
+    question = "provide the citation names mentioned in the paper"
     inputs = {"question": question}
     model_output = workflow.run_workflow(inputs)
     

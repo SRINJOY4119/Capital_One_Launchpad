@@ -7,14 +7,14 @@ sys.path.append(parent_dir)
 cache_base_dir = os.path.join(current_dir, "cache")
 os.makedirs(cache_base_dir, exist_ok=True)
 
-
 from langchain.text_splitter import RecursiveCharacterTextSplitter
-from chromadb.utils.embedding_functions import EmbeddingFunction
 from langchain_experimental.text_splitter import SemanticChunker
 from langchain_core.documents import Document
 from agno.embedder.google import GeminiEmbedder
 from typing import List
-from langchain_community.vectorstores import Chroma
+from langchain_community.vectorstores import FAISS
+from langchain.retrievers import EnsembleRetriever
+from langchain_community.retrievers import BM25Retriever
 from langchain import hub
 from langchain_groq import ChatGroq
 from langchain_core.output_parsers import StrOutputParser
@@ -37,11 +37,16 @@ import json
 import pandas as pd
 import pathlib
 import hashlib
+import pickle
 from gptcache import Cache
 from langchain.globals import set_llm_cache
 from gptcache.manager.factory import manager_factory
 from gptcache.processor.pre import get_prompt
 from langchain_community.cache import GPTCache
+import re
+import math
+import numpy as np
+from collections import Counter
 
 def get_hashed_name(name):
     return hashlib.sha256(name.encode()).hexdigest()
@@ -206,7 +211,7 @@ class LoadDocuments:
 
         return documents, questions, translations
     
-class MyEmbeddings(EmbeddingFunction):
+class MyEmbeddings:
     def __init__(self, model: str = None):
         self.embedder = GeminiEmbedder()
         # Create embedding cache directory
@@ -232,6 +237,10 @@ class MyEmbeddings(EmbeddingFunction):
                 json.dump(self._cache, f)
         except Exception as e:
             print(f"Warning: Could not save embedding cache: {e}")
+
+    def __call__(self, text):
+        """Make the class callable for FAISS compatibility"""
+        return self.embed_query(text)
 
     def embed_documents(self, texts: List[str]) -> List[List[float]]:
         embeddings = []
@@ -278,45 +287,61 @@ class ADAPTIVE_RAG:
         self.load_documents = LoadDocuments(file_path)
         self.chat_memory = []
         
+        # Initialize instance variables first
+        self.model = model
+        self.api_key = api_key
+        self.k = k
+        
         # Create vectorstore directory inside cache
-        self.vectorstore_dir = os.path.join(cache_base_dir, "vectorstore", "chroma_db")
+        self.vectorstore_dir = os.path.join(cache_base_dir, "vectorstore", "faiss_db")
         os.makedirs(self.vectorstore_dir, exist_ok=True)
+        
+        # FAISS index file paths
+        self.faiss_index_path = os.path.join(self.vectorstore_dir, "faiss_index")
+        self.faiss_pkl_path = os.path.join(self.vectorstore_dir, "faiss_vectorstore.pkl")
+        self.bm25_index_path = os.path.join(self.vectorstore_dir, "bm25_retriever.pkl")
+        self.doc_splits_path = os.path.join(self.vectorstore_dir, "doc_splits.pkl")
         
         # Check if vectorstore already exists to avoid reprocessing
         if self._vectorstore_exists():
             print("Loading existing vectorstore...")
             self.embd = MyEmbeddings()
-            self.vectorstore = Chroma(
-                collection_name="rag-chroma",
-                embedding_function=self.embd,
-                persist_directory=self.vectorstore_dir
-            )
+            self._load_existing_retrievers()
         else:
             print("Creating new vectorstore...")
             self.documents, self.questions, self.translations = self.load_documents.load_documents()
             self.embd = MyEmbeddings()
-            # Use SemanticChunker for better semantic understanding
             self.text_splitter = SemanticChunker(self.embd)
             self.doc_splits = self.text_splitter.split_documents(self.documents)
             
-            self.vectorstore = Chroma.from_documents(
-                documents=self.doc_splits,
-                collection_name="rag-chroma",
-                embedding=self.embd,
-                persist_directory=self.vectorstore_dir
+            doc_texts = [doc.page_content for doc in self.doc_splits]
+            
+            self.bm25_retriever = BM25Retriever.from_texts(
+                doc_texts, 
+                metadatas=[doc.metadata for doc in self.doc_splits]
             )
+            self.bm25_retriever.k = min(k, 3)
+            
+            self.faiss_vectorstore = FAISS.from_documents(
+                documents=self.doc_splits,
+                embedding=self.embd
+            )
+            self.faiss_retriever = self.faiss_vectorstore.as_retriever(search_kwargs={"k": min(k, 3)})
+            
+            self._save_retrievers()
+        
+        self.ensemble_retriever = EnsembleRetriever(
+            retrievers=[self.bm25_retriever, self.faiss_retriever],
+            weights=[0.5, 0.5]  
+        )
         
         self.compressor = CohereRerank(model="rerank-english-v3.0")
         
-        # Use async retriever with smaller k for faster retrieval
-        self.retriever = self.vectorstore.as_retriever(search_kwargs={"k": min(k, 3)})
-        
         self.compression_retriever = ContextualCompressionRetriever(
-            base_compressor=self.compressor, base_retriever=self.retriever
+            base_compressor=self.compressor, 
+            base_retriever=self.ensemble_retriever
         )
-        self.model = model
-        self.api_key = api_key
-        self.k = k
+        
         self.llm = ChatGroq(model=model, api_key=api_key)
         
         self.generator_prompt = """
@@ -347,9 +372,100 @@ class ADAPTIVE_RAG:
         )
 
     def _vectorstore_exists(self):
-        """Check if vectorstore already exists"""
-        chroma_files = ['chroma.sqlite3', 'index']
-        return all(os.path.exists(os.path.join(self.vectorstore_dir, f)) for f in chroma_files)
+        return (os.path.exists(self.faiss_index_path + ".faiss") or 
+                os.path.exists(self.faiss_pkl_path)) and os.path.exists(self.bm25_index_path)
+    
+    def _save_retrievers(self):
+        try:
+            # Method 1: Save FAISS vectorstore using native FAISS save
+            self.faiss_vectorstore.save_local(self.faiss_index_path)
+            print("FAISS vectorstore saved using native method.")
+            
+            # Method 2: Also save as pickle for backup
+            with open(self.faiss_pkl_path, 'wb') as f:
+                pickle.dump(self.faiss_vectorstore, f)
+            print("FAISS vectorstore saved as pickle backup.")
+            
+            # Save BM25 retriever
+            with open(self.bm25_index_path, 'wb') as f:
+                pickle.dump(self.bm25_retriever, f)
+            
+            # Save document splits for reference
+            with open(self.doc_splits_path, 'wb') as f:
+                pickle.dump(self.doc_splits, f)
+                
+            print("All retrievers and documents saved successfully.")
+        except Exception as e:
+            print(f"Warning: Could not save retrievers: {e}")
+    
+    def _load_existing_retrievers(self):
+        try:
+            if os.path.exists(self.faiss_index_path + ".faiss"):
+                self.faiss_vectorstore = FAISS.load_local(
+                    self.faiss_index_path, 
+                    self.embd,
+                    allow_dangerous_deserialization=True
+                )
+                print("FAISS vectorstore loaded using native method.")
+            elif os.path.exists(self.faiss_pkl_path):
+                with open(self.faiss_pkl_path, 'rb') as f:
+                    self.faiss_vectorstore = pickle.load(f)
+                print("FAISS vectorstore loaded from pickle backup.")
+            else:
+                raise FileNotFoundError("No FAISS vectorstore found")
+                
+            self.faiss_retriever = self.faiss_vectorstore.as_retriever(search_kwargs={"k": min(self.k, 3)})
+            
+            with open(self.bm25_index_path, 'rb') as f:
+                self.bm25_retriever = pickle.load(f)
+            
+            if os.path.exists(self.doc_splits_path):
+                with open(self.doc_splits_path, 'rb') as f:
+                    self.doc_splits = pickle.load(f)
+            
+            print("Existing retrievers loaded successfully.")
+        except Exception as e:
+            print(f"Error loading existing retrievers: {e}")
+            self.documents, self.questions, self.translations = self.load_documents.load_documents()
+            self.text_splitter = SemanticChunker(self.embd)
+            self.doc_splits = self.text_splitter.split_documents(self.documents)
+            
+            doc_texts = [doc.page_content for doc in self.doc_splits]
+            
+            self.bm25_retriever = BM25Retriever.from_texts(
+                doc_texts, 
+                metadatas=[doc.metadata for doc in self.doc_splits]
+            )
+            self.bm25_retriever.k = min(self.k, 3)
+            
+            self.faiss_vectorstore = FAISS.from_documents(
+                documents=self.doc_splits,
+                embedding=self.embd
+            )
+            self.faiss_retriever = self.faiss_vectorstore.as_retriever(search_kwargs={"k": min(self.k, 3)})
+            
+            self._save_retrievers()
+    
+    def save_vectorstore_manually(self):
+        self._save_retrievers()
+        
+    def clear_vectorstore_cache(self):
+        import shutil
+        if os.path.exists(self.vectorstore_dir):
+            shutil.rmtree(self.vectorstore_dir)
+            print("Vectorstore cache cleared.")
+        else:
+            print("No vectorstore cache to clear.")
+            
+    def get_vectorstore_info(self):
+        info = {
+            "faiss_exists": os.path.exists(self.faiss_index_path + ".faiss") or os.path.exists(self.faiss_pkl_path),
+            "bm25_exists": os.path.exists(self.bm25_index_path),
+            "doc_splits_exists": os.path.exists(self.doc_splits_path),
+            "vectorstore_dir": self.vectorstore_dir,
+            "num_documents": len(self.doc_splits) if hasattr(self, 'doc_splits') else 0
+        }
+        return info
         
     def retrieve(self, state):
         question = state["question"]
@@ -375,11 +491,9 @@ class ADAPTIVE_RAG:
         return {"documents": documents, "question": question, "generation": generation}
         
     def fast_generate(self, state):
-        """Fast generation without abstraction for simple queries"""
         question = state["question"]
         documents = state["documents"]
         
-        # Use simpler prompt for faster processing
         fast_prompt = f"Context: {documents}\n\nQuestion: {question}\n\nAnswer:"
         generation = self.llm.invoke(fast_prompt).content
         
@@ -392,7 +506,6 @@ class ADAPTIVE_RAG:
         return {"documents": documents, "question": question, "generation": generation}
         
     def grade_documents(self, state):
-        """Optimized document grading with early stopping"""
         question = state["question"]
         print("quest")
         documents = state["documents"]
@@ -484,3 +597,381 @@ class ADAPTIVE_RAG:
         """
         print("Recursion limit reached. Ending workflow.")
         return END
+
+    # === COMPLEXITY ANALYSIS METHODS ===
+    
+    def analyze_query_complexity(self, state):
+        question = state["question"]
+        documents = state["documents"]
+        
+        length_score = self._calculate_length_complexity(question)
+        linguistic_score = self._calculate_linguistic_complexity(question)
+        semantic_score = self._calculate_semantic_complexity(question)
+        structure_score = self._calculate_structural_complexity(question)
+        domain_score = self._calculate_domain_complexity(question)
+        intent_score = self._calculate_intent_complexity(question)
+        
+        doc_quality_score = self._calculate_document_quality(question, documents)
+        
+        complexity_vector = np.array([length_score, linguistic_score, semantic_score, 
+                                    structure_score, domain_score, intent_score])
+        weights = np.array([0.1, 0.25, 0.2, 0.15, 0.15, 0.15])
+        
+        total_complexity = np.dot(complexity_vector, weights)
+        normalized_complexity = 1 / (1 + math.exp(-2 * (total_complexity - 2.5)))
+        
+        print(f"Complexity scores: {complexity_vector}")
+        print(f"Total complexity: {total_complexity:.3f}")
+        print(f"Normalized complexity: {normalized_complexity:.3f}")
+        print(f"Document quality: {doc_quality_score:.3f}")
+        
+        return self._route_decision(normalized_complexity, doc_quality_score, question)
+    
+    def _calculate_length_complexity(self, question):
+        words = question.split()
+        word_count = len(words)
+        char_count = len(question)
+        
+        length_factor = math.log(1 + word_count) / math.log(20)
+        avg_word_length = char_count / max(word_count, 1)
+        complexity_factor = math.tanh((avg_word_length - 4) / 2)
+        
+        return min(length_factor + complexity_factor, 1.0)
+    
+    def _calculate_structural_complexity(self, question):
+        clause_indicators = [',', ';', ':', ' and ', ' or ', ' but ', ' however ', ' therefore ']
+        clause_density = sum(question.lower().count(indicator) for indicator in clause_indicators) / len(question)
+        
+        question_marks = question.count('?')
+        parentheses = (question.count('(') + question.count(')')) / 2
+        quotes = (question.count('"') + question.count("'")) / 2
+        
+        structural_features = np.array([clause_density * 100, question_marks, parentheses, quotes])
+        feature_weights = np.array([0.4, 0.3, 0.15, 0.15])
+        
+        weighted_score = np.dot(structural_features, feature_weights)
+        return math.tanh(weighted_score / 2)
+    
+    def _calculate_linguistic_complexity(self, question):
+        question_lower = question.lower()
+        
+        high_complexity_patterns = [
+            r'\bexplain\b', r'\banalyze\b', r'\bevaluate\b', r'\bassess\b',
+            r'\bdiscuss\b', r'\bexamine\b', r'\bcritique\b', r'\bjustify\b',
+            r'\bdemonstrate\b', r'\bsynthesize\b', r'\binterpret\b'
+        ]
+        
+        medium_complexity_patterns = [
+            r'\bhow\b', r'\bwhy\b', r'\bcompare\b', r'\bcontrast\b',
+            r'\bdescribe\b', r'\bidentify\b', r'\bsummarize\b'
+        ]
+        
+        simple_patterns = [
+            r'\bwhat\b', r'\bwhen\b', r'\bwhere\b', r'\bwho\b', r'\bwhich\b'
+        ]
+        
+        high_matches = sum(1 for pattern in high_complexity_patterns if re.search(pattern, question_lower))
+        medium_matches = sum(1 for pattern in medium_complexity_patterns if re.search(pattern, question_lower))
+        simple_matches = sum(1 for pattern in simple_patterns if re.search(pattern, question_lower))
+        
+        complexity_score = (high_matches * 3 + medium_matches * 2 - simple_matches * 0.5)
+        
+        conditional_words = ['if', 'suppose', 'assuming', 'given that', 'provided that']
+        conditional_boost = sum(1 for word in conditional_words if word in question_lower) * 0.5
+        
+        comparative_patterns = [r'\bmore\b', r'\bless\b', r'\bbetter\b', r'\bworse\b', r'\bmost\b', r'\bleast\b']
+        comparative_boost = sum(1 for pattern in comparative_patterns if re.search(pattern, question_lower)) * 0.3
+        
+        total_score = complexity_score + conditional_boost + comparative_boost
+        return 1 / (1 + math.exp(-total_score + 1))
+    
+    def _calculate_domain_complexity(self, question):
+        question_lower = question.lower()
+        
+        agriculture_domains = {
+            'crop_science': ['crop', 'cultivation', 'planting', 'harvest', 'yield', 'seeds', 'germination'],
+            'soil_science': ['soil', 'fertility', 'nutrients', 'nitrogen', 'phosphorus', 'potassium', 'ph'],
+            'pest_management': ['pest', 'disease', 'insect', 'fungus', 'virus', 'bacteria', 'weed'],
+            'water_management': ['irrigation', 'water', 'drought', 'rainfall', 'precipitation'],
+            'climate_weather': ['climate', 'weather', 'temperature', 'humidity', 'frost'],
+            'technology_precision': ['precision agriculture', 'gps', 'remote sensing', 'drones', 'sensors'],
+            'economics_policy': ['subsidy', 'market', 'price', 'cost', 'profit', 'economics'],
+            'livestock_animal': ['livestock', 'cattle', 'dairy', 'poultry', 'pig', 'sheep'],
+            'post_harvest': ['storage', 'processing', 'packaging', 'transportation']
+        }
+        
+        domain_weights = {
+            'technology_precision': 3.0, 'soil_science': 2.5, 'pest_management': 2.5,
+            'climate_weather': 2.0, 'water_management': 2.0, 'economics_policy': 2.0,
+            'crop_science': 1.5, 'livestock_animal': 1.5, 'post_harvest': 1.5
+        }
+        
+        domain_scores = []
+        for domain, terms in agriculture_domains.items():
+            matches = sum(1 for term in terms if term in question_lower)
+            if matches > 0:
+                weight = domain_weights.get(domain, 1.0)
+                score = math.log(1 + matches) * weight
+                domain_scores.append(score)
+        
+        if not domain_scores:
+            return 0.0
+            
+        max_score = max(domain_scores)
+        diversity_penalty = len(domain_scores) / len(agriculture_domains)
+        
+        technical_terms = ['agroecology', 'biotechnology', 'genomics', 'phenotyping', 'bioinformatics']
+        tech_boost = sum(1 for term in technical_terms if term in question_lower) * 0.5
+        
+        total_score = max_score + diversity_penalty + tech_boost
+        return math.tanh(total_score / 3)
+    
+    def _calculate_semantic_complexity(self, question):
+        question_lower = question.lower()
+        words = question.split()
+        
+        technical_indicators = [
+            'physiological', 'biochemical', 'molecular', 'cellular', 'genetic',
+            'morphological', 'phenotypic', 'genotypic', 'metabolic', 'enzymatic'
+        ]
+        
+        tech_density = sum(1 for term in technical_indicators if term in question_lower) / len(words)
+        
+        measurement_patterns = [
+            r'\d+\s*(kg|ton|hectare|acre|liter|ml|ppm|ph|°c|°f)',
+            r'\d+%\s*(moisture|protein|fat|fiber)',
+            r'\d+\s*(days|weeks|months)\s*(after|before)'
+        ]
+        
+        measurement_count = sum(1 for pattern in measurement_patterns if re.search(pattern, question_lower))
+        measurement_factor = math.log(1 + measurement_count)
+        
+        proper_nouns = sum(1 for word in words if word[0].isupper() and len(word) > 3)
+        entity_density = proper_nouns / len(words)
+        
+        concept_separators = ['crop and soil', 'pest and disease', 'irrigation and fertilization']
+        concept_complexity = sum(1 for sep in concept_separators if sep in question_lower)
+        
+        feature_vector = np.array([tech_density * 10, measurement_factor, entity_density * 10, concept_complexity])
+        weights = np.array([0.4, 0.2, 0.2, 0.2])
+        
+        semantic_score = np.dot(feature_vector, weights)
+        return math.tanh(semantic_score)
+    
+    def _calculate_intent_complexity(self, question):
+        question_lower = question.lower()
+        
+        intent_patterns = {
+            'diagnostic': [r'diagnose\b', r'identify.*problem\b', r'symptoms\b', r'deficiency\b'],
+            'optimization': [r'optimize\b', r'maximize.*yield\b', r'improve.*productivity\b'],
+            'planning': [r'plan.*cultivation\b', r'schedule.*planting\b', r'timing\b'],
+            'comparative': [r'compare.*varieties\b', r'best.*cultivar\b', r'versus\b'],
+            'predictive': [r'predict.*yield\b', r'forecast.*weather\b', r'estimate.*production\b'],
+            'management': [r'manage\b', r'control\b', r'prevent\b', r'strategy\b']
+        }
+        
+        intent_weights = {
+            'diagnostic': 3.0, 'optimization': 2.8, 'predictive': 2.5,
+            'planning': 2.0, 'management': 1.8, 'comparative': 1.5
+        }
+        
+        intent_scores = []
+        for intent_type, patterns in intent_patterns.items():
+            matches = sum(1 for pattern in patterns if re.search(pattern, question_lower))
+            if matches > 0:
+                weight = intent_weights.get(intent_type, 1.0)
+                score = math.log(1 + matches) * weight
+                intent_scores.append(score)
+        
+        if not intent_scores:
+            return 0.0
+            
+        max_intent_score = max(intent_scores)
+        
+        process_words = ['preparation', 'planting', 'maintenance', 'harvesting', 'post-harvest']
+        process_complexity = sum(1 for word in process_words if word in question_lower)
+        process_factor = math.sqrt(process_complexity) * 0.3
+        
+        total_score = max_intent_score + process_factor
+        return math.tanh(total_score / 3)
+    
+    def _calculate_document_quality(self, question, documents):
+        if not documents:
+            return 0.0
+            
+        question_lower = question.lower()
+        question_words = set(re.findall(r'\b\w+\b', question_lower))
+        stop_words = {'the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 'of', 'with', 'by'}
+        question_words = question_words - stop_words
+        
+        quality_scores = []
+        
+        for doc in documents[:5]:
+            doc_content = doc.page_content.lower()
+            doc_words = set(re.findall(r'\b\w+\b', doc_content))
+            
+            if not question_words:
+                relevance_ratio = 0
+            else:
+                overlap = len(question_words.intersection(doc_words))
+                relevance_ratio = overlap / len(question_words)
+            
+            content_length = len(doc.page_content)
+            length_factor = math.log(1 + content_length) / math.log(1000)
+            
+            sentences = doc_content.split('.')
+            relevant_sentences = sum(1 for sent in sentences if any(word in sent for word in question_words))
+            context_richness = relevant_sentences / max(len(sentences), 1)
+            
+            doc_quality = (relevance_ratio * 0.5 + length_factor * 0.3 + context_richness * 0.2)
+            quality_scores.append(doc_quality)
+        
+        if not quality_scores:
+            return 0.0
+            
+        avg_quality = np.mean(quality_scores)
+        return math.tanh(avg_quality * 2)
+    
+    def _route_decision(self, complexity_score, doc_quality, question):
+        question_lower = question.lower()
+        
+        if any(word in question_lower for word in ['what is', 'define', 'meaning of']):
+            threshold_simple, threshold_complex = 0.3, 0.7
+        elif any(word in question_lower for word in ['how to', 'best practice', 'recommend']):
+            threshold_simple, threshold_complex = 0.2, 0.6
+        elif any(word in question_lower for word in ['diagnose', 'problem', 'disease', 'pest']):
+            threshold_simple, threshold_complex = 0.15, 0.5
+        elif any(word in question_lower for word in ['yield', 'productivity', 'optimize', 'maximize']):
+            threshold_simple, threshold_complex = 0.1, 0.45
+        else:
+            threshold_simple, threshold_complex = 0.25, 0.65
+        
+        combined_score = complexity_score * (1 - doc_quality * 0.3)
+        
+        if combined_score <= threshold_simple and doc_quality >= 0.7:
+            return "simple_fast"
+        elif combined_score >= threshold_complex or doc_quality <= 0.2:
+            return "complex"
+        else:
+            return "moderate"
+
+    # === ADAPTIVE WORKFLOW HANDLERS ===
+    
+    def adaptive_router(self, state):
+        complexity_level = self.analyze_query_complexity(state)
+        
+        if complexity_level == "simple_fast":
+            return "simple_path"
+        elif complexity_level == "moderate":
+            return "moderate_path"
+        else:
+            return "complex_path"
+    
+    def simple_query_handler(self, state):
+        """Handle simple queries with fast generation"""
+        print("---SIMPLE QUERY DETECTED - FAST PATH---")
+        question = state["question"]
+        documents = state["documents"]
+        
+        simple_prompt = f"""
+        Based on the provided context, give a direct and concise answer to the question.
+        
+        Context: {documents[0].page_content if documents else "No context available"}
+        Question: {question}
+        
+        Answer:
+        """
+        
+        generation = self.llm.invoke(simple_prompt).content
+        
+        if len(self.chat_memory) < 5:
+            self.chat_memory.append(generation)
+        else:
+            self.chat_memory.pop(0)
+            self.chat_memory.append(generation)
+            
+        return {"documents": documents, "question": question, "generation": generation, "workflow_type": "simple"}
+        
+    def moderate_query_handler(self, state):
+        print("---MODERATE QUERY DETECTED - STANDARD RAG---")
+        return self.generate(state)
+        
+    def complex_query_handler(self, state):
+        print("---COMPLEX QUERY DETECTED - ENHANCED WORKFLOW---")
+        question = state["question"]
+        
+        # Step 1: Web search for additional context
+        search = Search(self.k)
+        web_docs = search.web_search(question)
+        print(f"Retrieved {len(web_docs)} web documents")
+        
+        # Step 2: Combine retrieved docs with web search results
+        combined_docs = state["documents"] + web_docs[:3]  # Add top 3 web results
+        
+        abstractor = Abstractor(self.model)
+        extractions = abstractor.abstract(combined_docs)
+        print("extracted info: ", extractions)
+        
+        enhanced_prompt = f"""
+        You are answering a complex agricultural query that requires comprehensive analysis. 
+        Use all provided context including web search results and extracted information.
+        
+        Question: {question}
+        Retrieved Documents: {state["documents"][:2]}
+        Web Search Results: {web_docs[:2] if web_docs else "None"}
+        Extracted Key Information: {extractions}
+        Chat History: {self.chat_memory}
+        
+        Provide a detailed, well-structured answer that addresses all aspects of the question.
+        """
+        
+        initial_generation = self.llm.invoke(enhanced_prompt).content
+        
+        hallucinationGrader = HallucinationGrader(self.model)
+        hallucination_grade = hallucinationGrader.grade_hallucinations(combined_docs, initial_generation)
+        
+        answerGrader = AnswerGrader(self.model)
+        answer_grade = answerGrader.grade_answer(question, initial_generation)
+        
+        print(f"Initial generation grading - Hallucination: {hallucination_grade}, Answer quality: {answer_grade}")
+        
+        if hallucination_grade == "no" or answer_grade == "no":
+            print("---USING INTROSPECTIVE AGENT FOR COMPLEX QUERY---")
+            
+            introspective_prompt = f"""
+            This is a complex agricultural question that requires careful analysis: {question}
+            
+            Previous attempt generated: {initial_generation}
+            
+            Issues identified:
+            - Hallucination check: {hallucination_grade}
+            - Answer quality: {answer_grade}
+            
+            Available context:
+            - Original documents: {state["documents"]}
+            - Web search results: {web_docs[:2] if web_docs else "None"}
+            - Extracted information: {extractions}
+            
+            Please provide a more accurate and comprehensive answer, ensuring it's grounded in the provided context.
+            """
+            
+            introspective_response = self.instropection_agent.chat(introspective_prompt)
+            final_generation = str(introspective_response)
+        else:
+            final_generation = initial_generation
+        
+        if len(self.chat_memory) < 5:
+            self.chat_memory.append(final_generation)
+        else:
+            self.chat_memory.pop(0)
+            self.chat_memory.append(final_generation)
+            
+        return {
+            "documents": combined_docs, 
+            "question": question, 
+            "generation": final_generation, 
+            "extractions": extractions,
+            "workflow_type": "complex",
+            "initial_generation": initial_generation,
+            "used_introspective_agent": hallucination_grade == "no" or answer_grade == "no"
+        }
