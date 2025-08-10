@@ -1,16 +1,16 @@
 import os
 from agno.agent import Agent, RunResponse
 from agno.tools.tavily import TavilyTools
-from agno.models.groq import Groq
+from agno.models.google import Gemini
 from dotenv import load_dotenv
 
 load_dotenv()
 
 class Search:
-    def __init__(self, k=3, model_id="llama-3.3-70b-versatile"):
+    def __init__(self, k=3, model_id="gemini-2.0-flash"):
         self.k = k
         self.agent = Agent(
-            model=Groq(id=model_id),
+            model=Gemini(id=model_id),
             tools=[TavilyTools()],
             show_tool_calls=True,
             markdown=True,

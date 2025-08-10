@@ -305,7 +305,8 @@ class ADAPTIVE_RAG:
         self.vectorstore_dir = os.path.join(self.cache_base_dir, "vectorstore", "faiss_db")
         os.makedirs(self.vectorstore_dir, exist_ok=True)
         
-        self.faiss_index_path = os.path.join(self.vectorstore_dir, "index")  
+        # Fix paths to match actual structure: faiss_index subdirectory exists
+        self.faiss_index_path = os.path.join(self.vectorstore_dir, "faiss_index")
         self.faiss_pkl_path = os.path.join(self.vectorstore_dir, "faiss_vectorstore.pkl")
         self.bm25_index_path = os.path.join(self.vectorstore_dir, "bm25_retriever.pkl")
         self.doc_splits_path = os.path.join(self.vectorstore_dir, "doc_splits.pkl")
@@ -350,7 +351,7 @@ class ADAPTIVE_RAG:
         )
         
         # Use only Google Gemini models
-        self.llm = ChatGroq(model=model, api_key=api_key)
+        self.llm = ChatGoogleGenerativeAI(model=model, api_key=api_key)
         
         self.generator_prompt = """
         You are an AI assistant for question-answering tasks. Use the provided context along with the previous chat history to deliver a precise and concise response. If the information is insufficient or unclear, acknowledge that you don't know. Keep the answer brief (three sentences or less) while maintaining clarity and relevance.
@@ -380,7 +381,9 @@ class ADAPTIVE_RAG:
         )
 
     def _vectorstore_exists(self):
-        return (os.path.exists(os.path.join(self.vectorstore_dir, "index.faiss")) or 
+        # Check for the actual file structure: faiss_index/index.faiss
+        faiss_index_file = os.path.join(self.vectorstore_dir, "faiss_index", "index.faiss")
+        return (os.path.exists(faiss_index_file) or 
                 os.path.exists(self.faiss_pkl_path)) and os.path.exists(self.bm25_index_path)
     
     def _save_retrievers(self):
@@ -400,8 +403,9 @@ class ADAPTIVE_RAG:
     
     def _load_existing_retrievers(self):
         try:
-            # Check for index.faiss in the vectorstore directory
-            if os.path.exists(os.path.join(self.vectorstore_dir, "index.faiss")):
+            # Check for index.faiss in the faiss_index subdirectory
+            faiss_index_file = os.path.join(self.vectorstore_dir, "faiss_index", "index.faiss")
+            if os.path.exists(faiss_index_file):
                 self.faiss_vectorstore = FAISS.load_local(
                     self.faiss_index_path, 
                     self.embd,
@@ -459,8 +463,9 @@ class ADAPTIVE_RAG:
             print("No vectorstore cache to clear.")
             
     def get_vectorstore_info(self):
+        faiss_index_file = os.path.join(self.vectorstore_dir, "faiss_index", "index.faiss")
         info = {
-            "faiss_exists": os.path.exists(self.faiss_index_path + ".faiss") or os.path.exists(self.faiss_pkl_path),
+            "faiss_exists": os.path.exists(faiss_index_file) or os.path.exists(self.faiss_pkl_path),
             "bm25_exists": os.path.exists(self.bm25_index_path),
             "doc_splits_exists": os.path.exists(self.doc_splits_path),
             "vectorstore_dir": self.vectorstore_dir,
@@ -512,7 +517,6 @@ class ADAPTIVE_RAG:
         documents = state["documents"]
         filtered_docs = []
         
-        # Process only top 3 documents for speed
         top_docs = documents[:3] if len(documents) > 3 else documents
         
         for d in top_docs:

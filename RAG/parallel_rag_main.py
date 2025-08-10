@@ -22,10 +22,10 @@ from agno.models.google import Gemini
 load_dotenv()
 
 class ParallelRAGSystem:
-    def __init__(self, model="llama-3.3-70b-versatile", k=3):
+    def __init__(self, model="gemini-2.0-flash", k=3):
         self.model = model
         self.k = k
-        self.api_key = os.getenv("GROQ_API_KEY")  # Keep using GROQ_API_KEY
+        self.api_key = os.getenv("GOOGLE_API_KEY")  
         self.data_dir = Path(current_dir) / "Data"
         self.cache_base = Path(cache_base_dir)
         
@@ -189,7 +189,6 @@ class ParallelRAGSystem:
                     status = "✅" if result["success"] else "❌"
                     print(f"{status} Completed: {file_path.name} ({successful_count}/{early_stop_threshold} successful)")
                     
-                    # Early stopping condition
                     if successful_count >= early_stop_threshold:
                         print(f"🎯 Early stopping triggered! Got {successful_count} successful results.")
                         print("🔄 Cancelling remaining tasks and proceeding to synthesis...")

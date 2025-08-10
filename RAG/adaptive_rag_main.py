@@ -38,11 +38,11 @@ set_llm_cache(GPTCache(init_gptcache))
 
   
 def main():
-    model = "llama-3.3-70b-versatile"
+    model = "gemini-2.0-flash"
     k = 3
     file_path = r"Data/CSV/agriculture_irrigation_qa_chunk_01.csv"
     
-    api_key = os.getenv("GROQ_API_KEY")
+    api_key = os.getenv("GOOGLE_API_KEY")
     
     workflow = Workflow(model, api_key, k, file_path)
 

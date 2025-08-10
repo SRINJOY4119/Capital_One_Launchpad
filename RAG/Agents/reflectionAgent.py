@@ -1,17 +1,17 @@
 import os
 from agno.agent import Agent, RunResponse
-from agno.models.groq import Groq
+from agno.models.google import Gemini
 from agno.tools.tavily import TavilyTools
 from dotenv import load_dotenv
 
 load_dotenv()
 
 class IntrospectiveAgent:
-    def __init__(self, model_id="llama-3.3-70b-versatile"):
+    def __init__(self, model_id="gemini-2.0-flash"):
         # Main reasoning agent
         self.main_agent = Agent(
             name="MainAgent",
-            model=Groq(id=model_id),
+            model=Gemini(id=model_id),
             tools=[TavilyTools()],
             markdown=True,
             instructions="""You are a knowledgeable assistant that helps users find information and answer questions. 
@@ -28,7 +28,7 @@ class IntrospectiveAgent:
         # Self-reflection agent
         self.reflection_agent = Agent(
             name="ReflectionAgent",
-            model=Groq(id=model_id),
+            model=Gemini(id=model_id),
             markdown=True,
             instructions="""You are a critical thinking assistant that evaluates responses for quality and accuracy.
             
@@ -45,7 +45,7 @@ class IntrospectiveAgent:
         # Synthesis agent that combines insights
         self.synthesis_agent = Agent(
             name="SynthesisAgent", 
-            model=Groq(id=model_id),
+            model=Gemini(id=model_id),
             markdown=True,
             instructions="""You are a synthesis expert that creates improved responses based on original answers and reflection feedback.
             

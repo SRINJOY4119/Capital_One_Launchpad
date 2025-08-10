@@ -1,14 +1,14 @@
 import os
 from agno.agent import Agent, RunResponse
-from agno.models.groq import Groq
+from agno.models.google import Gemini
 from dotenv import load_dotenv
 
 load_dotenv()
 
 class PlannerAgent:
-    def __init__(self, model_id="llama-3.3-70b-versatile"):
+    def __init__(self, model_id="gemini-2.0-flash"):
         self.agent = Agent(
-            model=Groq(id=model_id),
+            model=Gemini(id=model_id),
             markdown=True,
             instructions="""You are an AI planner expert in restructuring answers to completely resolve questions. When provided with an original question and a current answer that failed to resolve it, you must regenerate a better answer.
 

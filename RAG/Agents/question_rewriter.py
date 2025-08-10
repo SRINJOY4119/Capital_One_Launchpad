@@ -1,14 +1,14 @@
 import os
 from agno.agent import Agent, RunResponse
-from agno.models.groq import Groq
+from agno.models.google import Gemini
 from dotenv import load_dotenv
 
 load_dotenv()
 
 class QuestionRewriter:
-    def __init__(self, model_id="llama-3.3-70b-versatile"):
+    def __init__(self, model_id="gemini-2.0-flash"):
         self.rewriter_agent = Agent(
-            model=Groq(id=model_id),
+            model=Gemini(id=model_id),
             markdown=True,
             instructions="""You are a question re-writer that converts an input question to a better version that is optimized for vectorstore retrieval. Look at the input and try to reason about the underlying semantic intent / meaning.
             
@@ -22,7 +22,7 @@ class QuestionRewriter:
         )
         
         self.hyde_agent = Agent(
-            model=Groq(id=model_id),
+            model=Gemini(id=model_id),
             markdown=True,
             instructions="""You are a HyDE (Hypothetical Document Embeddings) generator. Your task is to generate a hypothetical answer or document that would contain the information needed to answer the given question.
             

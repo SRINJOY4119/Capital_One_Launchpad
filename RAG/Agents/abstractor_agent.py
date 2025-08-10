@@ -1,7 +1,7 @@
 import os
 import hashlib
 from agno.agent import Agent, RunResponse
-from agno.models.groq import Groq
+from agno.models.google import Gemini
 from pydantic import BaseModel, Field
 from dotenv import load_dotenv
 
@@ -11,9 +11,9 @@ def get_hashed_name(name):
     return hashlib.sha256(name.encode()).hexdigest()
 
 class Abstractor:
-    def __init__(self, model_id="llama-3.3-70b-versatile"):
+    def __init__(self, model_id="gemini-2.0-flash"):
         self.agent = Agent(
-            model=Groq(id=model_id),
+            model=Gemini(id=model_id),
             markdown=True,
             instructions='''You are an intelligent document analysis assistant that specializes in extracting and synthesizing information from retrieved documents. Your task is to analyze the provided content and generate accurate, relevant responses based on the given context.
 
