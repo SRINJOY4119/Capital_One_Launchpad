@@ -40,7 +40,7 @@ set_llm_cache(GPTCache(init_gptcache))
 def main():
     model = "llama-3.3-70b-versatile"
     k = 3
-    file_path = r"Data/From Chain-of-Thought to Cognitive Trees_ A Deeper Analysis of LLM Reasoning with Enhanced LCoT2Tree.pdf"
+    file_path = r"Data/CSV/agriculture_irrigation_qa_chunk_01.csv"
     
     api_key = os.getenv("GROQ_API_KEY")
     
@@ -48,7 +48,7 @@ def main():
 
     start = time.time()
 
-    question = "provide the citation names mentioned in the paper"
+    question = "Why is the location of the Indian Agricultural Research Institute important?"
     inputs = {"question": question}
     model_output = workflow.run_workflow(inputs)
     

@@ -17,6 +17,7 @@ from langchain.retrievers import EnsembleRetriever
 from langchain_community.retrievers import BM25Retriever
 from langchain import hub
 from langchain_groq import ChatGroq
+from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.output_parsers import StrOutputParser
 from Agents.search_agent import Search
 from langchain_core.prompts import ChatPromptTemplate
@@ -283,7 +284,7 @@ class MyEmbeddings:
     
         
 class ADAPTIVE_RAG:
-    def __init__(self, model, api_key, k, file_path):
+    def __init__(self, model, api_key, k, file_path, cache_dir=None):
         self.load_documents = LoadDocuments(file_path)
         self.chat_memory = []
         
@@ -292,8 +293,17 @@ class ADAPTIVE_RAG:
         self.api_key = api_key
         self.k = k
         
-        # Create vectorstore directory inside cache
-        self.vectorstore_dir = os.path.join(cache_base_dir, "vectorstore", "faiss_db")
+        # Use custom cache directory if provided
+        if cache_dir:
+            self.cache_base_dir = cache_dir
+        else:
+            current_dir = os.path.dirname(os.path.abspath(__file__))
+            self.cache_base_dir = os.path.join(current_dir, "cache")
+        
+        os.makedirs(self.cache_base_dir, exist_ok=True)
+        
+        # Create vectorstore directory inside custom cache
+        self.vectorstore_dir = os.path.join(self.cache_base_dir, "vectorstore", "faiss_db")
         os.makedirs(self.vectorstore_dir, exist_ok=True)
         
         # FAISS index file paths
@@ -302,7 +312,6 @@ class ADAPTIVE_RAG:
         self.bm25_index_path = os.path.join(self.vectorstore_dir, "bm25_retriever.pkl")
         self.doc_splits_path = os.path.join(self.vectorstore_dir, "doc_splits.pkl")
         
-        # Check if vectorstore already exists to avoid reprocessing
         if self._vectorstore_exists():
             print("Loading existing vectorstore...")
             self.embd = MyEmbeddings()
@@ -342,6 +351,7 @@ class ADAPTIVE_RAG:
             base_retriever=self.ensemble_retriever
         )
         
+        # Use only Google Gemini models
         self.llm = ChatGroq(model=model, api_key=api_key)
         
         self.generator_prompt = """
@@ -381,12 +391,7 @@ class ADAPTIVE_RAG:
             self.faiss_vectorstore.save_local(self.faiss_index_path)
             print("FAISS vectorstore saved using native method.")
             
-            # Method 2: Also save as pickle for backup
-            with open(self.faiss_pkl_path, 'wb') as f:
-                pickle.dump(self.faiss_vectorstore, f)
-            print("FAISS vectorstore saved as pickle backup.")
-            
-            # Save BM25 retriever
+            # Save BM25 retriever (skip FAISS pickle to avoid thread lock issues)
             with open(self.bm25_index_path, 'wb') as f:
                 pickle.dump(self.bm25_retriever, f)
             
@@ -394,7 +399,7 @@ class ADAPTIVE_RAG:
             with open(self.doc_splits_path, 'wb') as f:
                 pickle.dump(self.doc_splits, f)
                 
-            print("All retrievers and documents saved successfully.")
+            print("BM25 retriever and documents saved successfully.")
         except Exception as e:
             print(f"Warning: Could not save retrievers: {e}")
     

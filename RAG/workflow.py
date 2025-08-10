@@ -2,10 +2,29 @@ from pprint import pprint
 from adaptive_rag_class import ADAPTIVE_RAG
 from stategraph import GraphState
 from langgraph.graph import END, StateGraph, START
+import os
     
 class Workflow:
-    def __init__(self, model, api_key, k, csv_path):
-        self.adaptive_rag = ADAPTIVE_RAG(model, api_key, k, csv_path)
+    def __init__(self, model, api_key, k, file_path, cache_dir=None):
+        self.model = model
+        self.api_key = api_key  
+        self.k = k
+        self.file_path = file_path
+        
+        if cache_dir:
+            self.custom_cache_dir = cache_dir
+            os.makedirs(cache_dir, exist_ok=True)
+        else:
+            self.custom_cache_dir = None
+        
+        self.adaptive_rag = ADAPTIVE_RAG(
+            model=model, 
+            api_key=api_key, 
+            k=k, 
+            file_path=file_path,
+            cache_dir=cache_dir
+        )
+        
         self.workflow = StateGraph(GraphState)
         
         self.workflow.add_node("retrieve", self.adaptive_rag.retrieve)
