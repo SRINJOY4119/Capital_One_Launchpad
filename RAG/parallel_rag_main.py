@@ -25,7 +25,7 @@ class ParallelRAGSystem:
     def __init__(self, model="llama-3.3-70b-versatile", k=3):
         self.model = model
         self.k = k
-        self.api_key = os.getenv("GROQ_API_KEY")
+        self.api_key = os.getenv("GROQ_API_KEY")  # Keep using GROQ_API_KEY
         self.data_dir = Path(current_dir) / "Data"
         self.cache_base = Path(cache_base_dir)
         

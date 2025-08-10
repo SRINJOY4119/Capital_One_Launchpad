@@ -302,12 +302,10 @@ class ADAPTIVE_RAG:
         
         os.makedirs(self.cache_base_dir, exist_ok=True)
         
-        # Create vectorstore directory inside custom cache
         self.vectorstore_dir = os.path.join(self.cache_base_dir, "vectorstore", "faiss_db")
         os.makedirs(self.vectorstore_dir, exist_ok=True)
         
-        # FAISS index file paths
-        self.faiss_index_path = os.path.join(self.vectorstore_dir, "faiss_index")
+        self.faiss_index_path = os.path.join(self.vectorstore_dir, "index")  
         self.faiss_pkl_path = os.path.join(self.vectorstore_dir, "faiss_vectorstore.pkl")
         self.bm25_index_path = os.path.join(self.vectorstore_dir, "bm25_retriever.pkl")
         self.doc_splits_path = os.path.join(self.vectorstore_dir, "doc_splits.pkl")
@@ -382,20 +380,17 @@ class ADAPTIVE_RAG:
         )
 
     def _vectorstore_exists(self):
-        return (os.path.exists(self.faiss_index_path + ".faiss") or 
+        return (os.path.exists(os.path.join(self.vectorstore_dir, "index.faiss")) or 
                 os.path.exists(self.faiss_pkl_path)) and os.path.exists(self.bm25_index_path)
     
     def _save_retrievers(self):
         try:
-            # Method 1: Save FAISS vectorstore using native FAISS save
             self.faiss_vectorstore.save_local(self.faiss_index_path)
             print("FAISS vectorstore saved using native method.")
             
-            # Save BM25 retriever (skip FAISS pickle to avoid thread lock issues)
             with open(self.bm25_index_path, 'wb') as f:
                 pickle.dump(self.bm25_retriever, f)
             
-            # Save document splits for reference
             with open(self.doc_splits_path, 'wb') as f:
                 pickle.dump(self.doc_splits, f)
                 
@@ -405,7 +400,8 @@ class ADAPTIVE_RAG:
     
     def _load_existing_retrievers(self):
         try:
-            if os.path.exists(self.faiss_index_path + ".faiss"):
+            # Check for index.faiss in the vectorstore directory
+            if os.path.exists(os.path.join(self.vectorstore_dir, "index.faiss")):
                 self.faiss_vectorstore = FAISS.load_local(
                     self.faiss_index_path, 
                     self.embd,
