@@ -5,7 +5,7 @@ import json
 API_URL = "https://api.data.gov.in/resource/9ef84268-d588-465a-a308-a864a43d0070"
 API_KEY = "579b464db66ec23bdd000001a52cfa0cf9df446369ab0b90dbcd0df1"
 
-def fetch_market_price(state_name):
+def fetch_market_price(state_name="Karnataka"):
     print(f"[INFO] Fetching market prices for state: {state_name}")
     params = {
         "api-key": API_KEY,
@@ -15,13 +15,14 @@ def fetch_market_price(state_name):
     }
     
     try:
-        response = requests.get(API_URL, params=params, timeout=10)
+        response = requests.get(API_URL, params=params, timeout=15)
         response.raise_for_status()
         data = response.json()
         
     except requests.RequestException as e:
-        print(f"[ERROR] Failed to fetch data: {e}")
-        return json.dumps({"message": "Failed to fetch data"}, indent=4)
+        error_msg = f"Failed to fetch data: {e}"
+        print(f"[ERROR] {error_msg}")
+        return {"error": error_msg, "data": []}
     
     records = data.get("records", [])
     filtered = []
@@ -37,18 +38,17 @@ def fetch_market_price(state_name):
                 "min_price": record.get("min_price"),
                 "max_price": record.get("max_price"),
                 "modal_price": record.get("modal_price"),
+                "arrival_date": record.get("arrival_date", "")
             })
     
     if filtered:
-        print(f"[INFO] Found {len(filtered)} records for state: {state_name}\n")
-        json_output = json.dumps(filtered, indent=4)
+        print(f"[INFO] Found {len(filtered)} records for state: {state_name}")
+        result = {"success": True, "state": state_name, "count": len(filtered), "data": filtered}
     else:
-        message = {"message": "No records were found"}
-        print(f"[INFO] {message['message']}")
-        json_output = json.dumps(message, indent=4)
+        print(f"[INFO] No records found for state: {state_name}")
+        result = {"success": False, "state": state_name, "count": 0, "data": [], "message": "No records found"}
 
-    print(json_output)
-    return json_output
+    return result
 
 if __name__ == "__main__":
     state = 'Karnataka' if len(sys.argv) != 2 else sys.argv[1]
