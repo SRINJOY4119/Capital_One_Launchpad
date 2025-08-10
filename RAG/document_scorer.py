@@ -94,6 +94,11 @@ class FastQuerySummaryScorer:
         cosine_score = self.enhanced_cosine_similarity(query, summary)
         jaccard_score = self.jaccard_similarity(query, summary)
         
+        # Weighted ensemble with decreasing importance:
+        # - Semantic (40%): Highest weight as it captures meaning and context best
+        # - Domain (30%): Agricultural relevance is crucial for domain-specific queries
+        # - Cosine (20%): Traditional TF-IDF similarity provides lexical matching
+        # - Jaccard (10%): Simple overlap as baseline, least sophisticated metric
         final_score = (
             0.4 * semantic_score +
             0.3 * domain_score +
@@ -101,6 +106,11 @@ class FastQuerySummaryScorer:
             0.1 * jaccard_score
         )
         
+        # Sigmoid transformation to spread scores in [0.2, 0.9] range:
+        # - Shifts minimum score to 0.2 (avoiding near-zero scores)
+        # - Maps to 0.9 maximum for better discrimination
+        # - Steepness factor 6 creates good separation between relevant/irrelevant content
+        # - Inflection point 0.4 means scores above 0.4 get boosted significantly
         transformed_score = 0.2 + 0.7 * (1 / (1 + np.exp(-6 * (final_score - 0.4))))
         return transformed_score
 
@@ -146,5 +156,4 @@ def demo_fast_scoring():
 
 if __name__ == "__main__":
     demo_fast_scoring()
-        
-        
+
