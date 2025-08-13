@@ -147,9 +147,7 @@ if __name__ == "__main__":
     test_queries = [
         "Give me current weather conditions across major Indian agricultural states and their crop impact",
         "What's the latest monsoon update from IMD and how is it affecting Kharif crop sowing?",
-        "Analyze rainfall patterns in Maharashtra and their impact on cotton and sugarcane crops",
-        "Provide 7-day weather forecast for wheat growing regions in Punjab and Haryana",
-        "Search for drought conditions in Karnataka and Andhra Pradesh and their agricultural implications"
+        "Forecast weather conditions in next 7 days at Bankura"
     ]
     
     print("=== Indian Agricultural Weather Forecast Agent Demo ===\n")

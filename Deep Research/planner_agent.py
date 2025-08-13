@@ -96,7 +96,6 @@ class AgriculturalPlanningAgent:
             return "general"
 
     def _assign_best_agent(self, domain: str, task_name: str) -> str:
-        """Assign the best agent based on domain and task type"""
         # Primary assignment based on domain
         domain_mapping = {
             "soil": "soil_scientist",
@@ -117,7 +116,6 @@ class AgriculturalPlanningAgent:
         return domain_mapping.get(domain, "crop_agronomist")
 
     def create_tasks(self, objective: str) -> List[Task]:
-        """Break down objective into agricultural tasks"""
         
         # Standard agricultural research workflow
         base_tasks = [
