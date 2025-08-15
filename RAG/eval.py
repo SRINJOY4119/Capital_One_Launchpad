@@ -5,7 +5,7 @@ current_dir = os.path.dirname(os.path.abspath(__file__))
 parent_dir = os.path.dirname(current_dir)
 sys.path.append(parent_dir)
 from dotenv import load_dotenv
-from workflow import Workflow
+from Internet_checker import Workflow
 from adaptive_rag_class import LoadDocuments
 from rouge import Rouge
 from bert_score import score as bert_score  

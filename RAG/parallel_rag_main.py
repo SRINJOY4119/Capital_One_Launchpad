@@ -15,7 +15,7 @@ cache_base_dir = os.path.join(current_dir, "parallel_cache")
 os.makedirs(cache_base_dir, exist_ok=True)
 
 from dotenv import load_dotenv
-from workflow import Workflow
+from Internet_checker import Workflow
 from agno.agent import Agent
 from agno.models.google import Gemini
 from document_scorer import FastQuerySummaryScorer
