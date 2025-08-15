@@ -17,8 +17,9 @@ class Task(BaseModel):
     description: str = Field(..., description="Task description")
     agricultural_domain: str = Field(..., description="Agricultural domain (soil, crop, climate, etc.)")
     assigned_agent: str = Field(None, description="Assigned agricultural specialist")
-    estimated_hours: int = Field(..., description="Estimated hours to complete")
     dependencies: List[str] = Field(default_factory=list, description="Task dependencies")
+    subsearch_agents: int = Field(default=1, description="Number of subsearch agents required")
+    thought_process: List[str] = Field(default_factory=list, description="Chain of thought reasoning")
 
 class ResearchPlan(BaseModel):
     plan_id: str = Field(..., description="Plan identifier")
@@ -26,6 +27,8 @@ class ResearchPlan(BaseModel):
     objective: str = Field(..., description="Research objective")
     tasks: List[Task] = Field(..., description="List of tasks")
     agent_assignments: Dict[str, List[str]] = Field(..., description="Agent to tasks mapping")
+    total_subsearch_agents: int = Field(default=0, description="Total number of subsearch agents")
+    reasoning_chain: List[str] = Field(default_factory=list, description="Plan creation thought process")
 
 class AgriculturalPlanningAgent:
     def __init__(self):
@@ -50,16 +53,17 @@ class AgriculturalPlanningAgent:
             instructions=self._get_planning_instructions(),
         )
         
-        self.task_counter = 1
+        self.total_subsearch_agents = 0
 
     def _get_planning_instructions(self) -> str:
         return """
-        You are an Agricultural Research Planning Agent. Your job is to:
+        You are an Agricultural Research Planning Agent using chain-of-thought reasoning. Your job is to:
         
-        1. Break down research objectives into 4-6 manageable tasks
-        2. Assign each task to the most suitable agricultural specialist
-        3. Estimate realistic time requirements for each task
-        4. Identify task dependencies
+        1. Analyze the research objective
+        2. Break down into logical task components
+        3. Consider domain relationships and dependencies
+        4. Assign specialists based on expertise matching
+        5. Determine required number of subsearch agents per task
         
         Available specialists:
         - soil_scientist: Soil health, nutrients, pH, fertilizers, soil testing
@@ -69,11 +73,12 @@ class AgriculturalPlanningAgent:
         - climate_specialist: Weather patterns, climate adaptation, seasonal planning
         - sustainability_expert: Organic farming, sustainable practices, certification
         
-        For each task, determine:
-        - Which agricultural domain it belongs to (soil, crop, field, data, climate, sustainability)
-        - Which specialist is best suited for the work
-        - Realistic time estimate in hours
-        - Any dependencies on other tasks
+        For each task:
+        1. Document thought process
+        2. Determine agricultural domain
+        3. Match with best specialist
+        4. Identify task dependencies
+        5. Calculate required subsearch agents
         """
 
     def _determine_domain(self, task_description: str) -> str:
@@ -96,6 +101,7 @@ class AgriculturalPlanningAgent:
             return "general"
 
     def _assign_best_agent(self, domain: str, task_name: str) -> str:
+        """Assign the best agent based on domain and task type"""
         # Primary assignment based on domain
         domain_mapping = {
             "soil": "soil_scientist",
@@ -115,52 +121,64 @@ class AgriculturalPlanningAgent:
         
         return domain_mapping.get(domain, "crop_agronomist")
 
-    def create_tasks(self, objective: str) -> List[Task]:
+    def _analyze_task_complexity(self, task_description: str) -> int:
+        """Determine number of subsearch agents needed based on task complexity"""
+        complexity_indicators = {
+            'analyze': 2,
+            'research': 2,
+            'investigate': 2,
+            'compare': 2,
+            'evaluate': 3,
+            'synthesize': 3,
+            'integrate': 3,
+            'optimize': 3
+        }
         
-        # Standard agricultural research workflow
+        base_agents = 1
+        for indicator, value in complexity_indicators.items():
+            if indicator in task_description.lower():
+                base_agents = max(base_agents, value)
+        return base_agents
+
+    def create_tasks(self, objective: str) -> List[Task]:
+        """Break down objective into tasks using chain of thought"""
+        thought_process = [
+            f"Analyzing objective: {objective}",
+            "Identifying key research components",
+            "Determining task breakdown structure",
+            "Evaluating domain relationships"
+        ]
+        
         base_tasks = [
             {
-                "name": "Literature Review",
-                "description": f"Research existing studies and best practices related to: {objective}",
-                "hours": 8
+                "name": "Initial Analysis",
+                "description": f"Analyze requirements and context for: {objective}",
+                "thought": ["Consider scope", "Identify stakeholders", "Define boundaries"]
             },
             {
-                "name": "Site Assessment", 
-                "description": f"Evaluate field conditions, soil, climate for: {objective}",
-                "hours": 12
+                "name": "Research Design",
+                "description": f"Design research methodology for: {objective}",
+                "thought": ["Review methods", "Select approaches", "Plan implementation"]
             },
             {
-                "name": "Methodology Design",
-                "description": f"Design research approach and protocols for: {objective}",
-                "hours": 16
+                "name": "Data Collection",
+                "description": f"Gather and organize data for: {objective}",
+                "thought": ["Define data needs", "Plan collection", "Ensure quality"]
             },
             {
-                "name": "Implementation",
-                "description": f"Execute the research plan and collect data for: {objective}",
-                "hours": 24
-            },
-            {
-                "name": "Data Analysis",
-                "description": f"Analyze results and interpret findings for: {objective}",
-                "hours": 12
-            },
-            {
-                "name": "Recommendations",
-                "description": f"Develop practical recommendations based on: {objective}",
-                "hours": 8
+                "name": "Analysis & Synthesis",
+                "description": f"Analyze findings and synthesize results for: {objective}",
+                "thought": ["Process data", "Identify patterns", "Draw conclusions"]
             }
         ]
         
         tasks = []
-        dependencies = []
-        
         for i, task_info in enumerate(base_tasks):
-            # Determine domain and assign agent
             domain = self._determine_domain(task_info["description"])
             agent = self._assign_best_agent(domain, task_info["name"])
+            subsearch_count = self._analyze_task_complexity(task_info["description"])
             
-            # Set dependencies (each task depends on previous)
-            deps = [f"T{i}"] if i > 1 else []
+            self.total_subsearch_agents += subsearch_count
             
             task = Task(
                 task_id=f"T{i+1}",
@@ -168,10 +186,10 @@ class AgriculturalPlanningAgent:
                 description=task_info["description"],
                 agricultural_domain=domain,
                 assigned_agent=agent,
-                estimated_hours=task_info["hours"],
-                dependencies=deps
+                dependencies=[f"T{i}"] if i > 0 else [],
+                subsearch_agents=subsearch_count,
+                thought_process=task_info["thought"]
             )
-            
             tasks.append(task)
             
         return tasks
@@ -188,12 +206,16 @@ class AgriculturalPlanningAgent:
         return {agent: task_list for agent, task_list in assignments.items() if task_list}
 
     def create_plan(self, title: str, objective: str) -> ResearchPlan:
-        """Create a simple research plan with task assignments"""
+        """Create research plan with chain of thought reasoning"""
+        reasoning_chain = [
+            f"Analyzing research objective: {objective}",
+            "Breaking down into component tasks",
+            "Evaluating specialist requirements",
+            "Determining subsearch agent needs"
+        ]
+        
         try:
-            # Break down into tasks
             tasks = self.create_tasks(objective)
-            
-            # Create agent assignments
             agent_assignments = self.create_agent_assignments(tasks)
             
             plan = ResearchPlan(
@@ -201,7 +223,9 @@ class AgriculturalPlanningAgent:
                 title=title,
                 objective=objective,
                 tasks=tasks,
-                agent_assignments=agent_assignments
+                agent_assignments=agent_assignments,
+                total_subsearch_agents=self.total_subsearch_agents,
+                reasoning_chain=reasoning_chain
             )
             
             return plan
@@ -211,40 +235,28 @@ class AgriculturalPlanningAgent:
             raise
 
     def display_plan(self, plan: ResearchPlan):
-        """Display the research plan in a clear format"""
+        """Display the research plan with thought process"""
         print(f"\n{'='*50}")
         print(f"AGRICULTURAL RESEARCH PLAN")
         print(f"{'='*50}")
         print(f"Title: {plan.title}")
         print(f"Objective: {plan.objective}")
-        print(f"Plan ID: {plan.plan_id}")
         
-        print(f"\n{'Tasks:':<20}")
-        print("-" * 50)
-        total_hours = 0
+        print("\nReasoning Chain:")
+        for step in plan.reasoning_chain:
+            print(f"- {step}")
+        
+        print("\nTasks:")
         for task in plan.tasks:
-            print(f"{task.task_id}: {task.name}")
-            print(f"   Domain: {task.agricultural_domain}")
-            print(f"   Assigned: {task.assigned_agent}")
-            print(f"   Hours: {task.estimated_hours}")
-            print(f"   Dependencies: {', '.join(task.dependencies) if task.dependencies else 'None'}")
-            print(f"   Description: {task.description}")
-            print()
-            total_hours += task.estimated_hours
+            print(f"\n{task.task_id}: {task.name}")
+            print(f"Domain: {task.agricultural_domain}")
+            print(f"Assigned: {task.assigned_agent}")
+            print(f"Subsearch Agents: {task.subsearch_agents}")
+            print("Thought Process:")
+            for thought in task.thought_process:
+                print(f"- {thought}")
         
-        print(f"{'Agent Assignments:':<20}")
-        print("-" * 50)
-        for agent, task_ids in plan.agent_assignments.items():
-            agent_name = agent.replace('_', ' ').title()
-            specialization = self.available_agents[agent]
-            task_hours = sum(task.estimated_hours for task in plan.tasks if task.task_id in task_ids)
-            print(f"{agent_name}:")
-            print(f"   Specialization: {specialization}")
-            print(f"   Tasks: {', '.join(task_ids)} ({task_hours} hours)")
-            print()
-        
-        print(f"Total Estimated Hours: {total_hours}")
-        print(f"Estimated Duration: {total_hours // 8} working days")
+        print(f"\nTotal Subsearch Agents Required: {plan.total_subsearch_agents}")
 
 def main():
     planner = AgriculturalPlanningAgent()
