@@ -9,7 +9,10 @@ from dotenv import load_dotenv
 
 current_dir = os.path.dirname(os.path.abspath(__file__))
 parent_dir = os.path.dirname(current_dir)
+project_root = os.path.dirname(parent_dir)
+
 sys.path.append(parent_dir)
+sys.path.append(project_root)
 
 from Tools.fetchMarketPrice import fetch_market_price
 from agno.tools.tavily import TavilyTools
