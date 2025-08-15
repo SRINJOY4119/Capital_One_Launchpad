@@ -1,3 +1,13 @@
 # Capital_One_Launchpad
 
-PRITHVI (Pipelined Retrieval & Intelligent Tooling for Holistic & Versatile Insights in Agriculture) is a resilient AI Agent Orchestrator built on a domain-tuned Retrieval-Augmented Generation (RAG) pipeline and query-complexity-driven orchestration, integrating high-capability reasoning models (e.g., **Gemini-2.5-Pro**) for complex, multi-hop decisions and **offline fallbacks (AgriPARM, Qwen-1.5–1.8B)** for no-internet operation. It delivers context-aware recommendations across crop selection, irrigation, fertilizer optimization, pest and disease detection, yield forecasting, weather advisories, and market analysis while mitigating hallucination via multi-source fact-checking and Human-in-the-Loop (HITL) validation. PRITHVI’s tooling layer includes: **Fertilizer Recommendation Tool, Tavily Web Search Tool, Market Price Retrieval Tool, Weather Forecast Tool, Crop Recommendation Tool, Crop Yield Prediction Tool, Pest Detection Tool, Translation Tool,** and **Crop Disease Tool**—all invoked dynamically by specialized agents using semantic search, hybrid retrieval (FAISS+BM25), multi-modal inputs, and parallelized RAG processing to ensure accurate, accessible, and trustworthy agricultural guidance.
+The proposed solution, PRAGATI – Precision Retrieval & AI for Generative Agriculture Technology & Insights – is a
+RAG-Powered Multi-Agent Intelligence System tailored to agricultural domain knowledge. At its core, the
+Retrieval-Augmented Generation (RAG) pipeline integrates semantic search with domain-specific knowledge base
+retrieval, ensuring all AI-generated responses are grounded in verified agricultural data. This enables precise, timely,
+and context-aware recommendations through specialized AI agents for crop selection, irrigation, fertilizer use, pest
+detection, weather forecasting, and market price analysis.
+PRAGATI employs query complexity assessment to optimize retrieval and generation, while multi-agent
+orchestration ensures the right expertise is applied to each query. Its multi-lingual and multi-modal capabilities
+(text, image, and voice inputs) make it accessible to a wide range of users. Deep research pipelines enhance
+coverage, and a Human-in-the-Loop (HITL) mechanism validates outputs for factual accuracy and trustworthiness,
+ensuring reliable decision support for farmers and agricultural stakeholders.
