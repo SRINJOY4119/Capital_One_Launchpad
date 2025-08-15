@@ -26,15 +26,28 @@ async def detect_disease(image: UploadFile = File(...)):
             shutil.copyfileobj(image.file, buffer)
         agent = get_agent()
         result = agent.analyze_disease(temp_path)
+        disease_name = result.disease_name
+        disease_probability = result.disease_probability
+        symptoms = result.symptoms
+        treatments = result.Treatments
+        prevention_tips = result.prevention_tips
         return CropDiseaseDetectionResponse(
             success=True,
-            diseases=result,
+            diseases=disease_name,
+            disease_probabilities=disease_probability,
+            symptoms=symptoms,
+            Treatments=treatments,
+            prevention_tips=prevention_tips,
             image_path=temp_path
         )
     except Exception as e:
         return CropDiseaseDetectionResponse(
             success=False,
             diseases=None,
+            disease_probabilities=None,
+            symptoms=None,
+            Treatments=None,
+            prevention_tips=None,
             image_path=None,
             error=f"Failed to detect crop disease: {str(e)}"
         )
