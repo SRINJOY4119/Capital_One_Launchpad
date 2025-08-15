@@ -1,10 +1,15 @@
 import requests
 import json
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
 
 API_URL = "https://weather.googleapis.com/v1/forecast/days:lookup"
 
 
-def get_google_weather_forecast(latitude: float, longitude: float, api_key: str) -> dict:
+def get_google_weather_forecast(latitude: float, longitude: float) -> dict:
+    api_key = os.getenv("GOOGLE_WEATHER_API_KEY")
     params = {
         "location.latitude": latitude,
         "location.longitude": longitude,
@@ -95,7 +100,6 @@ def get_google_weather_forecast(latitude: float, longitude: float, api_key: str)
 
 if __name__ == "__main__":
     lat, lon = 28.6139, 77.2090  # New Delhi, India
-    api_key = "YOUR_API_KEY"
 
-    forecast_data = get_google_weather_forecast(lat, lon, api_key)
+    forecast_data = get_google_weather_forecast(lat, lon)
     print(json.dumps(forecast_data, indent=4))
