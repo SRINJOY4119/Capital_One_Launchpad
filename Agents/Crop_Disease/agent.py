@@ -23,6 +23,8 @@ class CropDiseaseAgent:
             markdown=True,
             debug_mode=False,
             show_tool_calls=True,
+            add_history_to_messages=True,
+            num_history_responses=5,
             tools=[detect_crop_disease, TavilyTools()],
             instructions="""
 You are an advanced crop disease analysis agent. Your task is to analyze crop images for disease symptoms and provide a clear diagnosis and actionable recommendations.

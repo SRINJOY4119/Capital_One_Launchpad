@@ -26,6 +26,8 @@ class PestPredictionAgent:
                 self.analyze_pest_trends,
                 self.generate_pest_report
             ],
+            add_history_to_messages=True,
+            num_history_responses=5,
             instructions="""You are an expert agricultural pest management specialist with advanced AI-powered pest identification capabilities.
 
 Your primary functions:

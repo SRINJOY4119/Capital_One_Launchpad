@@ -23,6 +23,8 @@ class CreditPolicyMarketAgent:
         self.agent = Agent(
             model=Gemini(id="gemini-2.0-flash"), 
             tools=[self.market_capture_tool.run_comprehensive_analysis, ThinkingTools(), TavilyTools()], 
+            add_history_to_messages=True, 
+            num_history_responses=5,
             instructions="""
 You are an expert Credit Policy & Market Agent specialized in agricultural finance and market intelligence. Follow this systematic chain of thought approach:
 
