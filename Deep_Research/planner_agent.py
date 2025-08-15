@@ -18,7 +18,7 @@ class Task(BaseModel):
     agricultural_domain: str = Field(..., description="Agricultural domain (soil, crop, climate, etc.)")
     assigned_agent: str = Field(None, description="Assigned agricultural specialist")
     dependencies: List[str] = Field(default_factory=list, description="Task dependencies")
-    subsearch_agents: int = Field(default=1, description="Number of subsearch agents required")
+    subsearch_agents: int = Field(default=1, description="Number of subsearch agents required (max 5)")
     thought_process: List[str] = Field(default_factory=list, description="Chain of thought reasoning")
 
 class ResearchPlan(BaseModel):
@@ -27,12 +27,15 @@ class ResearchPlan(BaseModel):
     objective: str = Field(..., description="Research objective")
     tasks: List[Task] = Field(..., description="List of tasks")
     agent_assignments: Dict[str, List[str]] = Field(..., description="Agent to tasks mapping")
-    total_subsearch_agents: int = Field(default=0, description="Total number of subsearch agents")
+    total_subsearch_agents: int = Field(default=0, description="Total number of subsearch agents (capped at 5 per task)")
     reasoning_chain: List[str] = Field(default_factory=list, description="Plan creation thought process")
 
 class AgriculturalPlanningAgent:
     def __init__(self):
         load_dotenv()
+        
+        # Maximum subsearch agents per task
+        self.MAX_SUBSEARCH_AGENTS = 5
         
         # Define available agricultural specialists
         self.available_agents = {
@@ -56,14 +59,14 @@ class AgriculturalPlanningAgent:
         self.total_subsearch_agents = 0
 
     def _get_planning_instructions(self) -> str:
-        return """
+        return f"""
         You are an Agricultural Research Planning Agent using chain-of-thought reasoning. Your job is to:
         
         1. Analyze the research objective
         2. Break down into logical task components
         3. Consider domain relationships and dependencies
         4. Assign specialists based on expertise matching
-        5. Determine required number of subsearch agents per task
+        5. Determine required number of subsearch agents per task (MAX {self.MAX_SUBSEARCH_AGENTS} per task)
         
         Available specialists:
         - soil_scientist: Soil health, nutrients, pH, fertilizers, soil testing
@@ -78,7 +81,9 @@ class AgriculturalPlanningAgent:
         2. Determine agricultural domain
         3. Match with best specialist
         4. Identify task dependencies
-        5. Calculate required subsearch agents
+        5. Calculate required subsearch agents (maximum {self.MAX_SUBSEARCH_AGENTS} per task)
+        
+        IMPORTANT: Each task can have a maximum of {self.MAX_SUBSEARCH_AGENTS} subsearch agents to ensure resource efficiency.
         """
 
     def _determine_domain(self, task_description: str) -> str:
@@ -122,8 +127,10 @@ class AgriculturalPlanningAgent:
         return domain_mapping.get(domain, "crop_agronomist")
 
     def _analyze_task_complexity(self, task_description: str) -> int:
-        """Determine number of subsearch agents needed based on task complexity"""
+        """Determine number of subsearch agents needed based on task complexity (max 5)"""
         complexity_indicators = {
+            'simple': 1,
+            'basic': 1,
             'analyze': 2,
             'research': 2,
             'investigate': 2,
@@ -131,14 +138,30 @@ class AgriculturalPlanningAgent:
             'evaluate': 3,
             'synthesize': 3,
             'integrate': 3,
-            'optimize': 3
+            'optimize': 3,
+            'comprehensive': 4,
+            'complex': 4,
+            'multi-faceted': 4,
+            'extensive': 5,
+            'large-scale': 5
         }
         
         base_agents = 1
+        desc_lower = task_description.lower()
+        
+        # Find the highest complexity match
         for indicator, value in complexity_indicators.items():
-            if indicator in task_description.lower():
+            if indicator in desc_lower:
                 base_agents = max(base_agents, value)
-        return base_agents
+        
+        # Apply the maximum limit
+        subsearch_count = min(base_agents, self.MAX_SUBSEARCH_AGENTS)
+        
+        # Log if we're capping the agents
+        if base_agents > self.MAX_SUBSEARCH_AGENTS:
+            logger.info(f"Task complexity suggests {base_agents} agents, capping at {self.MAX_SUBSEARCH_AGENTS}")
+        
+        return subsearch_count
 
     def create_tasks(self, objective: str) -> List[Task]:
         """Break down objective into tasks using chain of thought"""
@@ -146,7 +169,8 @@ class AgriculturalPlanningAgent:
             f"Analyzing objective: {objective}",
             "Identifying key research components",
             "Determining task breakdown structure",
-            "Evaluating domain relationships"
+            "Evaluating domain relationships",
+            f"Applying {self.MAX_SUBSEARCH_AGENTS} agent limit per task"
         ]
         
         base_tasks = [
@@ -178,6 +202,9 @@ class AgriculturalPlanningAgent:
             agent = self._assign_best_agent(domain, task_info["name"])
             subsearch_count = self._analyze_task_complexity(task_info["description"])
             
+            # Add thought about agent limitation
+            enhanced_thought = task_info["thought"] + [f"Allocated {subsearch_count} subsearch agents (max {self.MAX_SUBSEARCH_AGENTS})"]
+            
             self.total_subsearch_agents += subsearch_count
             
             task = Task(
@@ -188,7 +215,7 @@ class AgriculturalPlanningAgent:
                 assigned_agent=agent,
                 dependencies=[f"T{i}"] if i > 0 else [],
                 subsearch_agents=subsearch_count,
-                thought_process=task_info["thought"]
+                thought_process=enhanced_thought
             )
             tasks.append(task)
             
@@ -211,7 +238,8 @@ class AgriculturalPlanningAgent:
             f"Analyzing research objective: {objective}",
             "Breaking down into component tasks",
             "Evaluating specialist requirements",
-            "Determining subsearch agent needs"
+            f"Determining subsearch agent needs (max {self.MAX_SUBSEARCH_AGENTS} per task)",
+            "Ensuring resource optimization"
         ]
         
         try:
@@ -241,6 +269,7 @@ class AgriculturalPlanningAgent:
         print(f"{'='*50}")
         print(f"Title: {plan.title}")
         print(f"Objective: {plan.objective}")
+        print(f"Max Subsearch Agents per Task: {self.MAX_SUBSEARCH_AGENTS}")
         
         print("\nReasoning Chain:")
         for step in plan.reasoning_chain:
@@ -251,18 +280,20 @@ class AgriculturalPlanningAgent:
             print(f"\n{task.task_id}: {task.name}")
             print(f"Domain: {task.agricultural_domain}")
             print(f"Assigned: {task.assigned_agent}")
-            print(f"Subsearch Agents: {task.subsearch_agents}")
+            print(f"Subsearch Agents: {task.subsearch_agents}/{self.MAX_SUBSEARCH_AGENTS}")
             print("Thought Process:")
             for thought in task.thought_process:
                 print(f"- {thought}")
         
         print(f"\nTotal Subsearch Agents Required: {plan.total_subsearch_agents}")
+        print(f"Average Agents per Task: {plan.total_subsearch_agents/len(plan.tasks):.1f}")
 
 def main():
     planner = AgriculturalPlanningAgent()
     
     print("Agricultural Research Planning Assistant")
     print("=" * 40)
+    print(f"Maximum {planner.MAX_SUBSEARCH_AGENTS} subsearch agents per task")
     
     # Get input
     title = input("Research Title: ").strip() or "Agricultural Research Study"
