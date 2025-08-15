@@ -1,11 +1,15 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
-from Agents.Multi_Lingual.routers import router
+from Agents.Multi_Lingual.routers import router as multilingual_router
+from Agents.Risk_Management.routers import router as risk_router
+from Agents.Web_Scrapping.routers import router as webscrap_router
+from Agents.Credit_Policy_Market.routers import router as creditpolicy_router
+from Agents.Weather_forcast.routers import router as weather_router
 
 app = FastAPI(
     title="Agricultural Agent API",
-    description="API for multilingual agricultural assistance with code-switching support",
+    description="API for multilingual agricultural assistance and analytics",
     version="1.0.0"
 )
 
@@ -17,21 +21,30 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.include_router(router)
+app.include_router(multilingual_router)
+app.include_router(risk_router)
+app.include_router(webscrap_router)
+app.include_router(creditpolicy_router)
+app.include_router(weather_router)
 
 @app.get("/")
 async def root():
     return {
-        "message": "Multilingual Agricultural Agent API",
+        "message": "Agricultural Agent API",
         "version": "1.0.0",
         "endpoints": {
-            "agriculture_query": "/api/v1/agriculture/respond"
+            "agriculture_query": "/api/v1/agriculture/respond",
+            "risk_analysis": "/api/v1/risk/analyze",
+            "web_scrap": "/api/v1/webscrap/scrape",
+            "credit_policy": "/api/v1/creditpolicy/analyze",
+            "weather_forecast": "/api/v1/weather/forecast",
+            "pest_prediction": "/api/v1/pest/predict"
         }
     }
 
 @app.get("/health")
 async def health_check():
-    return {"status": "healthy", "service": "multilingual-agriculture-api"}
+    return {"status": "healthy", "service": "agriculture-agent-api"}
 
 if __name__ == "__main__":
     uvicorn.run(
