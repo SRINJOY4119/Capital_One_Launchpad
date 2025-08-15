@@ -1,151 +1,252 @@
 from agno.agent import Agent
-from agno.models.google import Gemini
+from agno.models.groq import Groq
+from agno.team.team import Team
 from agno.tools.arxiv import ArxivTools
 from agno.tools.wikipedia import WikipediaTools
 from agno.tools.tavily import TavilyTools
 from dotenv import load_dotenv
 import json
-from typing import Dict, List, Any
+from typing import Dict, List, Any, Optional
+from textwrap import dedent
+import asyncio
 
 load_dotenv()
 
-class SubsearchAgent:
-    def __init__(self):
-        self.agent = Agent(
-            model=Gemini(id="gemini-2.0-flash"),
-            tools=[ArxivTools(), WikipediaTools(), TavilyTools()],
-            instructions=self._get_instructions()
-        )
+# Main 3 Agents
+arxiv_agent = Agent(
+    name="ArXiv Research Agent",
+    role="Academic papers and scholarly research specialist",
+    model=Groq(id="llama-3.3-70b-versatile"),
+    tools=[ArxivTools()],
+    instructions=dedent("""
+    You are the ArXiv Research Agent specializing in academic papers and scholarly publications.
     
-    def _get_instructions(self):
-        return """You are a specialized subsearch agent for deep research pipelines. Your role is to perform comprehensive, multi-source information gathering and analysis.
+    YOUR ROLE:
+    - Search and analyze ArXiv papers
+    - Focus on recent research and developments
+    - Provide detailed paper summaries
+    - Identify key research trends
+    
+    IMPORTANT:
+    - Remove all emojis from responses
+    - Use professional academic tone
+    - Focus on your ArXiv research expertise
+    - Complete your research independently
+    - Do not try to coordinate other agents
+    """),
+)
 
-TOOL USAGE STRATEGY:
-- ArxivTools: Use for academic papers, research studies, scientific publications, technical documentation
-- WikipediaTools: Use for general knowledge, definitions, historical context, basic factual information
-- TavilyTools: Use for comprehensive web search, business information, latest developments, specialized queries, current events, and diverse web sources
+wikipedia_agent = Agent(
+    name="Wikipedia Knowledge Agent", 
+    role="Foundational knowledge and background information specialist",
+    model=Groq(id="llama-3.3-70b-versatile"),
+    tools=[WikipediaTools()],
+    instructions=dedent("""
+    You are the Wikipedia Knowledge Agent specializing in foundational knowledge and context.
+    
+    YOUR ROLE:
+    - Provide encyclopedic knowledge and definitions
+    - Give historical context and background
+    - Explain fundamental concepts
+    - Verify factual information
+    
+    IMPORTANT:
+    - Remove all emojis from responses
+    - Use clear, informative tone
+    - Focus on your Wikipedia knowledge expertise
+    - Complete your research independently
+    - Do not try to coordinate other agents
+    """),
+)
 
-RESEARCH METHODOLOGY:
-1. Start with Wikipedia for foundational knowledge and context
-2. Use Arxiv for peer-reviewed academic sources and technical depth
-3. Leverage Tavily for comprehensive web analysis, current news, and business intelligence
-4. Cross-reference findings across all sources for accuracy validation
+tavily_agent = Agent(
+    name="Web Intelligence Agent",
+    role="Current web information and market intelligence specialist", 
+    model=Groq(id="llama-3.3-70b-versatile"),
+    tools=[TavilyTools()],
+    instructions=dedent("""
+    You are the Web Intelligence Agent specializing in current web information and developments.
+    
+    YOUR ROLE:
+    - Search current web information via Tavily
+    - Focus on recent developments and trends
+    - Gather market intelligence and news
+    - Provide real-time insights
+    
+    IMPORTANT:
+    - Remove all emojis from responses
+    - Use professional analytical tone
+    - Focus on your web research expertise
+    - Complete your research independently
+    - Do not try to coordinate other agents
+    """),
+)
 
-OUTPUT REQUIREMENTS:
-- Provide detailed, well-structured responses with source citations
-- Include confidence levels for each claim
-- Highlight conflicting information from different sources
-- Synthesize information from multiple tools into coherent insights
-- Always verify facts across at least 2 different source types
+# One Main Research Team
+research_team = Team(
+    name="Multi-Agent Research Team",
+    mode="sequential",
+    model=Groq(id="llama-3.3-70b-versatile"),
+    members=[
+        wikipedia_agent,      # First: Get foundational knowledge
+        arxiv_agent,         # Second: Get academic research
+        tavily_agent,        # Third: Get current developments
+    ],
+    instructions=[
+        "You are a comprehensive research team with 3 specialized agents.",
+        "Each agent focuses on their specialty area and provides complete analysis.",
+        "Wikipedia Agent: Provide foundational knowledge and context first.",
+        "ArXiv Agent: Then provide academic research and papers.",
+        "Tavily Agent: Finally provide current web developments and trends.",
+        "Remove all emojis and maintain professional tone.",
+        "Each agent works independently - no coordination between agents.",
+    ],
+    show_tool_calls=False,
+    markdown=True,
+)
 
-SEARCH PATTERNS:
-- For technical topics: Wikipedia → Arxiv → Tavily
-- For current events: Tavily → Wikipedia → Arxiv
-- For business/market research: Tavily → Wikipedia → Arxiv
-- For academic research: Arxiv → Wikipedia → Tavily"""
-
-    def search_academic(self, query: str) -> Dict[str, Any]:
-        prompt = f"""Conduct an academic research search on: {query}
-
-SEARCH SEQUENCE:
-1. Search Wikipedia for background context and definitions
-2. Search Arxiv for peer-reviewed papers and technical studies
-3. Search Tavily for recent academic developments and citations
-
-Provide a comprehensive academic analysis with proper citations."""
+class ResearchCoordinator:
+    """Simple coordinator with one team and three agents"""
+    
+    def __init__(self):
+        self.team = research_team
+        self.arxiv_agent = arxiv_agent
+        self.wikipedia_agent = wikipedia_agent 
+        self.tavily_agent = tavily_agent
         
-        return self._execute_search(prompt)
-
-    def search_current_events(self, query: str) -> Dict[str, Any]:
-        prompt = f"""Research current events and recent developments about: {query}
-
-SEARCH SEQUENCE:
-1. Search Tavily for comprehensive recent coverage and current news
-2. Search Wikipedia for background context
-3. Search Arxiv for any related research studies
-
-Focus on timeline, recent developments, and current status."""
+    def search(self, query: str, context: Optional[str] = None) -> Dict[str, Any]:
+        """Main research method using the team"""
+        print("🔍 Starting research with Multi-Agent Research Team...")
         
-        return self._execute_search(prompt)
-
-    def search_business_intelligence(self, query: str) -> Dict[str, Any]:
-        prompt = f"""Conduct business intelligence research on: {query}
-
-SEARCH SEQUENCE:
-1. Search Tavily for business news, market analysis, company information, and diverse business sources
-2. Search Wikipedia for company history and industry background
-3. Search Arxiv for relevant business research and case studies
-
-Provide market insights, competitive analysis, and business trends."""
-        
-        return self._execute_search(prompt)
-
-    def search_comprehensive(self, query: str) -> Dict[str, Any]:
-        prompt = f"""Perform comprehensive multi-source research on: {query}
-
-SEARCH SEQUENCE:
-1. Search Wikipedia for foundational knowledge and context
-2. Search Arxiv for academic and technical sources
-3. Search Tavily for comprehensive web analysis, current information, and verification
-
-Synthesize all sources into a complete research report with cross-validation."""
-        
-        return self._execute_search(prompt)
-
-    def search_technical_deep_dive(self, query: str) -> Dict[str, Any]:
-        prompt = f"""Conduct technical deep-dive research on: {query}
-
-SEARCH SEQUENCE:
-1. Search Arxiv for latest research papers and technical documentation
-2. Search Wikipedia for technical definitions and foundational concepts
-3. Search Tavily for industry applications, technical implementations, and technical forums
-
-Focus on technical accuracy, implementation details, and expert opinions."""
-        
-        return self._execute_search(prompt)
-
-    def _execute_search(self, prompt: str) -> Dict[str, Any]:
         try:
-            response = self.agent.run(prompt)
+            # Prepare the research query
+            research_query = self._prepare_query(query, context)
+            
+            # Run the team research
+            response = self.team.run(research_query)
+            
             return {
                 "success": True,
-                "content": response.content,
-                "metadata": {
-                    "sources_used": ["arxiv", "wikipedia", "tavily"],
-                    "search_type": "multi_source",
-                    "confidence": "cross_validated"
-                }
+                "content": response.content if hasattr(response, 'content') else str(response),
+                "query": query,
+                "team_name": "Multi-Agent Research Team",
+                "agents_used": ["Wikipedia Agent", "ArXiv Agent", "Tavily Agent"],
+                "approach": "sequential_team_research"
             }
+            
+        except Exception as e:
+            print(f"❌ Team research failed: {str(e)}")
+            return self._fallback_search(query, context, str(e))
+    
+    def search_individual(self, query: str, agent_type: str, context: Optional[str] = None) -> Dict[str, Any]:
+        """Search using individual agent (fallback or specific needs)"""
+        agents = {
+            "arxiv": self.arxiv_agent,
+            "wikipedia": self.wikipedia_agent,
+            "tavily": self.tavily_agent
+        }
+        
+        if agent_type not in agents:
+            return {
+                "success": False,
+                "error": f"Unknown agent type: {agent_type}. Available: {list(agents.keys())}",
+                "query": query
+            }
+        
+        print(f"🔍 Starting research with {agent_type.title()} Agent...")
+        
+        try:
+            agent = agents[agent_type]
+            research_query = self._prepare_query(query, context)
+            response = agent.run(research_query)
+            
+            return {
+                "success": True,
+                "content": response.content if hasattr(response, 'content') else str(response),
+                "query": query,
+                "agent_name": agent.name,
+                "agent_type": agent_type,
+                "approach": "individual_agent_research"
+            }
+            
         except Exception as e:
             return {
                 "success": False,
                 "error": str(e),
-                "fallback_content": "Search execution failed"
+                "query": query,
+                "agent_type": agent_type
             }
-
-    def custom_search(self, query: str, tool_sequence: List[str]) -> Dict[str, Any]:
-        tool_map = {
-            "arxiv": "ArxivTools",
-            "wikipedia": "WikipediaTools", 
-            "tavily": "TavilyTools"
-        }
-        
-        sequence_instruction = " → ".join([tool_map[tool] for tool in tool_sequence])
-        
-        prompt = f"""Execute custom search sequence for: {query}
-
-CUSTOM SEARCH SEQUENCE: {sequence_instruction}
-
-Follow the exact tool sequence provided and synthesize results comprehensively."""
-        
-        return self._execute_search(prompt)
-
-
-
-
-if __name__ == "__main__":
-    agent = SubsearchAgent()
-    research_query = "sustainable agriculture AI technologies 2024"
-    result = agent.search_comprehensive(research_query)
-    print(result["content"])
     
+    def _prepare_query(self, query: str, context: Optional[str] = None) -> str:
+        """Prepare the research query"""
+        research_query = f"Research Topic: {query}\n\n"
+        
+        if context:
+            research_query += f"Additional Context: {context}\n\n"
+            
+        research_query += """Instructions:
+- Conduct thorough research on this topic using your specialized tools
+- Provide comprehensive analysis and insights
+- Include relevant sources and evidence
+- Focus on accuracy and depth
+- Use professional tone without emojis
+- Work independently and complete your analysis"""
+        
+        return research_query
+    
+    def _fallback_search(self, query: str, context: Optional[str], error: str) -> Dict[str, Any]:
+        """Fallback to individual agents if team fails"""
+        print("🔄 Team failed, trying fallback with individual agents...")
+        
+        results = []
+        
+        # Try each agent individually
+        for agent_type in ["wikipedia", "arxiv", "tavily"]:
+            result = self.search_individual(query, agent_type, context)
+            if result["success"]:
+                results.append(f"**{agent_type.title()} Agent Results:**\n{result['content']}\n")
+        
+        if results:
+            combined_content = "\n".join(results)
+            return {
+                "success": True,
+                "content": combined_content,
+                "query": query,
+                "team_name": "Fallback Individual Agents",
+                "agents_used": ["Wikipedia Agent", "ArXiv Agent", "Tavily Agent"],
+                "approach": "fallback_individual_research",
+                "original_error": error
+            }
+        else:
+            return {
+                "success": False,
+                "error": f"Both team and individual agents failed. Original error: {error}",
+                "query": query
+            }
+    
+
+
+# Example usage
+if __name__ == "__main__":
+    # Initialize coordinator
+    coordinator = ResearchCoordinator()
+    
+    # Research query
+    query = "sustainable agriculture AI technologies 2024"
+    
+    print("Starting research...")
+    
+    # Perform research
+    result = coordinator.search(query)
+    
+    if result["success"]:
+        print("Research completed successfully!")
+        print("\nResults:")
+        print("-" * 50)
+        print(result['content'])
+        
+    else:
+        print("Research failed:")
+        print(f"Error: {result['error']}")
+    
+    print("\nDone!")
