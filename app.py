@@ -9,6 +9,7 @@ from Agents.Weather_forcast.routers import router as weather_router
 from Agents.Crop_Disease.routers import router as crop_disease_router
 from Agents.Market_Price.routers import router as market_price_router
 from Agents.Image_Analysis.routers import router as image_analysis_router
+from Agents.Pest_prediction.routers import router as pest_prediction_router
 
 app = FastAPI(
     title="Agricultural Agent API",
@@ -32,6 +33,7 @@ app.include_router(weather_router)
 app.include_router(crop_disease_router)
 app.include_router(market_price_router)
 app.include_router(image_analysis_router)
+app.include_router(pest_prediction_router)
 
 @app.get("/")
 async def root():

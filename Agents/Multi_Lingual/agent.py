@@ -1,7 +1,11 @@
 import sys
 import os
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+current_dir = os.path.dirname(os.path.abspath(__file__))
+parent_dir = os.path.dirname(current_dir)
+project_root = os.path.dirname(parent_dir)
 
+sys.path.append(parent_dir)
+sys.path.append(project_root)
 from agno.agent import Agent
 from agno.models.google import Gemini
 from Tools.translation_tool import MultiLanguageTranslator
