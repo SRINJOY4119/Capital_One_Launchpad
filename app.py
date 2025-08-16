@@ -12,6 +12,7 @@ from Agents.Image_Analysis.routers import router as image_analysis_router
 from Agents.Pest_prediction.routers import router as pest_prediction_router
 from Agents.Crop_Recommender.routers import router as crop_recommender_router
 from Agents.Location_Information.routers import router as location_information_router
+from Agents.News.routers import router as news_router
 from Tools.tool_apis_router import router as tool_apis_router
 
 app = FastAPI(
@@ -39,6 +40,7 @@ app.include_router(image_analysis_router)
 app.include_router(pest_prediction_router)
 app.include_router(crop_recommender_router)
 app.include_router(location_information_router)
+app.include_router(news_router)
 app.include_router(tool_apis_router)
 
 @app.get("/")

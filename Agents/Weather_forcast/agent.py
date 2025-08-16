@@ -71,9 +71,7 @@ if __name__ == "__main__":
     weather_agent = WeatherForecastAgent(model_id="llama-3.3-70b-versatile")
     
     test_queries = [
-        "Give me current weather conditions across major Indian agricultural states and their crop impact",
-        "What's the latest monsoon update from IMD and how is it affecting Kharif crop sowing?",
-        "Forecast weather conditions in next 7 days at Bankura"
+        "what is the chance of raining today at Kolkata??"
     ]
     
     print("=== Indian Agricultural Weather Forecast Agent Demo ===\n")
