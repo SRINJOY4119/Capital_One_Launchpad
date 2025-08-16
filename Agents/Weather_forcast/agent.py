@@ -5,6 +5,7 @@ import sys
 from typing import Optional, Dict, Any
 from agno.agent import Agent
 from agno.models.google import Gemini
+from agno.models.groq import Groq
 from dotenv import load_dotenv
 
 
@@ -23,9 +24,13 @@ load_dotenv()
 
 class WeatherForecastAgent:
     def __init__(self, model_id="gemini-2.0-flash"):
+        if model_id == "gemini-2.0-flash":
+            model = Gemini(id=model_id)
+        else:
+            model = Groq(id=model_id)
         self.agent = Agent(
-            model=Gemini(id=model_id),
-            tools=[TavilyTools(), get_google_weather_forecast, weather_forecast_inference],
+            model=model,
+            tools=[TavilyTools(), get_google_weather_forecast],
             show_tool_calls=True,
             markdown=True,
             add_history_to_messages=True,
@@ -63,7 +68,7 @@ OUTPUT REQUIREMENTS:
         return response.content
 
 if __name__ == "__main__":
-    weather_agent = WeatherForecastAgent()
+    weather_agent = WeatherForecastAgent(model_id="llama-3.3-70b-versatile")
     
     test_queries = [
         "Give me current weather conditions across major Indian agricultural states and their crop impact",

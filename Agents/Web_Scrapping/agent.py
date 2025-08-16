@@ -10,6 +10,7 @@ sys.path.append(os.path.join(project_root, 'Tools'))
 
 from agno.agent import Agent
 from agno.models.google import Gemini
+from agno.models.groq import Groq
 from dotenv import load_dotenv
 from agno.tools.tavily import TavilyTools
 from Tools.web_scrapper import scrape_agri_prices, scrape_policy_updates, scrape_links
@@ -17,9 +18,13 @@ from Tools.web_scrapper import scrape_agri_prices, scrape_policy_updates, scrape
 load_dotenv()
 
 class AgriculturalWebScrappingAgent:
-    def __init__(self):
+    def __init__(self, model_id = "gemini-2.0-flash"):
+        if model_id == "gemini-2.0-flash":
+            model = Gemini(id=model_id)
+        else:
+            model = Groq(id=model_id)
         self.agent = Agent(
-            model=Gemini(id="gemini-2.0-flash"),
+            model=model,
             tools=[scrape_agri_prices, scrape_policy_updates, scrape_links, TavilyTools()],
             show_tool_calls=True,
             markdown=True,
@@ -58,6 +63,6 @@ OUTPUT REQUIREMENTS:
         return self.agent.run(query).content
 
 if __name__ == "__main__":
-    agent = AgriculturalWebScrappingAgent()
+    agent = AgriculturalWebScrappingAgent(model_id="llama-3.3-70b-versatile")
     prompt = "Scrape and summarize the latest wheat mandi prices in Punjab and provide key trends and relevant links."
     print(agent.scrape(prompt))

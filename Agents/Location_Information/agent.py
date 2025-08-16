@@ -7,9 +7,9 @@ from dotenv import load_dotenv
 load_dotenv()
 
 class LocationAgriAssistant:
-    def __init__(self):
+    def __init__(self, model_id = "gemini-2.0-flash"):
         self.agent = Agent(
-            model=Gemini(id="gemini-2.0-flash"),
+            model=Gemini(id=model_id),
             tools=[GoogleMapTools(), TavilyTools()],
             instructions=(
                 "You are an agricultural and location information specialist. "

@@ -1,5 +1,7 @@
 import sys
 import os
+
+from groq import Groq
 current_dir = os.path.dirname(os.path.abspath(__file__))
 parent_dir = os.path.dirname(current_dir)
 project_root = os.path.dirname(parent_dir)
@@ -8,6 +10,7 @@ sys.path.append(parent_dir)
 sys.path.append(project_root)
 from agno.agent import Agent
 from agno.models.google import Gemini
+from agno.models.groq import Groq
 from Tools.translation_tool import MultiLanguageTranslator
 from dotenv import load_dotenv
 
@@ -15,9 +18,13 @@ load_dotenv()
 
 class MultiLingualAgent:
     def __init__(self, model_id="gemini-2.0-flash"):
+        if model_id == "gemini-2.0-flash":
+            model = Gemini(id=model_id)
+        else:
+            model = Groq(id=model_id)
         self.translator = MultiLanguageTranslator()
         self.agent = Agent(
-            model=Gemini(id=model_id),
+            model=model,
             markdown=True,
             show_tool_calls=True,
             add_history_to_messages=True,
@@ -81,8 +88,8 @@ AGRICULTURAL EXPERTISE:
         return response
 
 def test_multilingual_agent():
-    agent = MultiLingualAgent()
-    
+    agent = MultiLingualAgent(model_id="llama-3.3-70b-versatile")
+
     test_queries = [
         "What is the best fertilizer for rice crops?",
         "গেহুঁর জন্য সেরা সার কী?",  # Bengali
