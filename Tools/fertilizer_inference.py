@@ -1,9 +1,14 @@
 import pickle
 import numpy as np
 import os
+import sys
+
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../models/Fertilizer-Recommendation')))
 
 class FertilizerRecommendationInference:
-    def __init__(self, model_path='../models/Fertilizer-Recommendation/Fertilizer_StackedModel.pkl'):
+    def __init__(self, model_path=None):
+        if model_path is None:
+            model_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '../models/Fertilizer-Recommendation/Fertilizer_StackedModel.pkl'))
         self.model_path = model_path
         self.model = None
         self.le_soil = None

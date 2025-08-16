@@ -6,16 +6,20 @@ from sklearn.preprocessing import MinMaxScaler
 from sklearn.preprocessing import LabelEncoder
 from datetime import datetime
 import os
+import sys
+
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../models/Crop-Recommendation')))
 
 def load_crop_recommendation_models():
     models = {}
+    base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '../models/Crop-Recommendation'))
     model_paths = {
-        'decision_tree': '../models/Crop-Recommendation/DecisionTree.pkl',
-        'naive_bayes': '../models/Crop-Recommendation/NBClassifier.pkl', 
-        'random_forest': '../models/Crop-Recommendation/RandomForest.pkl',
-        'svm': '../models/Crop-Recommendation/SVMClassifier.pkl',
-        'xgboost': '../models/Crop-Recommendation/XGBoost.pkl',
-        'stacked': '../models/Crop-Recommendation/StackedModel.pkl'
+        'decision_tree': os.path.join(base_dir, 'DecisionTree.pkl'),
+        'naive_bayes': os.path.join(base_dir, 'NBClassifier.pkl'), 
+        'random_forest': os.path.join(base_dir, 'RandomForest.pkl'),
+        'svm': os.path.join(base_dir, 'SVMClassifier.pkl'),
+        'xgboost': os.path.join(base_dir, 'XGBoost.pkl'),
+        'stacked': os.path.join(base_dir, 'StackedModel.pkl')
     }
     print(f"[INFO] Current working directory: {os.getcwd()}")
     for model_name, path in model_paths.items():

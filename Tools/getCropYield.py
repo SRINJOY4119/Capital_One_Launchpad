@@ -8,11 +8,12 @@ import os
 
 def load_crop_yield_models():
     models = {}
+    base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '../models/Crop_Yield_Prediction'))
     model_paths = {
-        "linear_reg" : "../models/Crop_Yield_Prediction/linear_regression_model.pkl",
-        "random_forest" : "../models/Crop_Yield_Prediction/random_forest_model.pkl",
-        "decision_tree" : "../models/Crop_Yield_Prediction/decision_tree_model.pkl",
-        "stacked_2" : "../models/Crop_Yield_Prediction/Stacked_model_2.pkl"
+        "linear_reg" : os.path.join(base_dir, "linear_regression_model.pkl"),
+        "random_forest" : os.path.join(base_dir, "random_forest_model.pkl"),
+        "decision_tree" : os.path.join(base_dir, "decision_tree_model.pkl"),
+        "stacked_2" : os.path.join(base_dir, "Stacked_model_2.pkl")
     }
     print(f"[INFO] Current working directory: {os.getcwd()} ")
     for model_name, path in model_paths.items():
