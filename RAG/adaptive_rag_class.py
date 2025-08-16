@@ -19,19 +19,19 @@ from langchain import hub
 from langchain_groq import ChatGroq
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.output_parsers import StrOutputParser
-from Agents.search_agent import Search
+from .Agents.search_agent import Search
 from langchain_core.prompts import ChatPromptTemplate
 from langchain.retrievers.contextual_compression import ContextualCompressionRetriever
 from langchain_cohere import CohereRerank
 from langchain_community.llms import Cohere
-from Agents.answer_grader_agent import AnswerGrader
-from Agents.hallucinator_agent import HallucinationGrader
-from Agents.grader_agent import Grader
-from Agents.question_rewriter import QuestionRewriter
-from Agents.abstractor_agent import Abstractor
+from .Agents.answer_grader_agent import AnswerGrader
+from .Agents.hallucinator_agent import HallucinationGrader
+from .Agents.grader_agent import Grader
+from .Agents.question_rewriter import QuestionRewriter
+from .Agents.abstractor_agent import Abstractor
 from pprint import pprint
 from langgraph.graph import END
-from Agents.reflectionAgent import IntrospectiveAgent
+from .Agents.reflectionAgent import IntrospectiveAgent
 # Additional imports for document loading
 from langchain_community.document_loaders import PyPDFLoader, TextLoader, UnstructuredWordDocumentLoader
 import json
@@ -95,8 +95,16 @@ class LoadDocuments:
         translations = []
 
         for _, row in df.iterrows():
-            # General CSV format - combine all columns into content
-            content = "\n".join([f"{col}: {row[col]}" for col in df.columns if pd.notna(row[col])])
+            content_parts = []
+            for col in df.columns:
+                val = row[col]
+                if pd.notna(val):
+                    if isinstance(val, list):
+                        val_str = ", ".join(str(v) for v in val)
+                    else:
+                        val_str = str(val)
+                    content_parts.append(f"{col}: {val_str}")
+            content = "\n".join(content_parts)
             documents.append(Document(
                 page_content=content,
                 metadata={"row_index": row.name, "source": self.file_path}
@@ -373,10 +381,10 @@ class ADAPTIVE_RAG:
             ]
         )
         self.rag_chain = self.rag_prompt | self.llm | StrOutputParser()
-        self.recursion_limit = 7
+        self.recursion_limit = 2
         self.recursion_counter = 0
-        
-        self.instropection_agent = IntrospectiveAgent(
+
+        self.introspective_agent = IntrospectiveAgent(
             model_id=self.model,
         )
 
@@ -582,15 +590,17 @@ class ADAPTIVE_RAG:
             This is the question given by the user : {question}
             These are the most relevant retrieved documents : {retrieved_docs[0]} 
         """
-        response = self.instropection_agent.chat(final_prompt)
+        response = self.introspective_agent.introspect_and_respond(final_prompt)
         return {"generation": str(response), "question": question, "extractions": extracted_info, "documents": retrieved_docs}
         
     def track_recursion_and_retrieve(self, state):
         """
         Track the number of recursions when going to 'transform_query'.
-        End the workflow if the recursion limit is reached.
+        End the workflow if the recursion limit (2) is reached.
         """
-        if self.recursion_counter < self.recursion_limit:
+        if not hasattr(self, "recursion_counter"):
+            self.recursion_counter = 0
+        if self.recursion_counter < 2:
             self.recursion_counter += 1
             return "retrieve"
         else:
@@ -904,77 +914,112 @@ class ADAPTIVE_RAG:
     def complex_query_handler(self, state):
         print("---COMPLEX QUERY DETECTED - ENHANCED WORKFLOW---")
         question = state["question"]
-        
+
         # Step 1: Web search for additional context
         search = Search(self.k)
-        web_docs = search.web_search(question)
+        try:
+            # The Search agent's web_search returns a string summary, not a list of Document objects.
+            web_search_result = search.web_search(question)
+            # Wrap the result in a Document object for consistency
+            from langchain_core.documents import Document
+            if web_search_result and isinstance(web_search_result, str):
+                web_docs = [Document(page_content=web_search_result, metadata={"source": "web_search"})]
+            else:
+                web_docs = []
+        except Exception as e:
+            print(f"Error during web search: {e}")
+            web_docs = []
+
         print(f"Retrieved {len(web_docs)} web documents")
-        
+
         # Step 2: Combine retrieved docs with web search results
-        combined_docs = state["documents"] + web_docs[:3]  # Add top 3 web results
-        
+        docs_list = state["documents"] if isinstance(state["documents"], list) else [state["documents"]]
+        docs_list = [doc for doc in docs_list if doc and hasattr(doc, "page_content") and doc.page_content]
+        combined_docs = docs_list + web_docs[:3]  # Add up to 3 web results
+
         abstractor = Abstractor(self.model)
-        extractions = abstractor.abstract(combined_docs)
+        try:
+            extractions = abstractor.abstract(combined_docs)
+        except Exception as e:
+            print(f"Error during abstraction: {e}")
+            extractions = ""
+
         print("extracted info: ", extractions)
-        
+
         enhanced_prompt = f"""
         You are answering a complex agricultural query that requires comprehensive analysis. 
         Use all provided context including web search results and extracted information.
-        
+
         Question: {question}
-        Retrieved Documents: {state["documents"][:2]}
+        Retrieved Documents: {docs_list[:2]}
         Web Search Results: {web_docs[:2] if web_docs else "None"}
         Extracted Key Information: {extractions}
         Chat History: {self.chat_memory}
-        
+
         Provide a detailed, well-structured answer that addresses all aspects of the question.
         """
-        
-        initial_generation = self.llm.invoke(enhanced_prompt).content
-        
+
+        try:
+            initial_generation = self.llm.invoke(enhanced_prompt).content
+        except Exception as e:
+            print(f"Error during LLM generation: {e}")
+            initial_generation = "Error generating answer."
+
         hallucinationGrader = HallucinationGrader(self.model)
-        hallucination_grade = hallucinationGrader.grade_hallucinations(combined_docs, initial_generation)
-        
+        try:
+            hallucination_grade = hallucinationGrader.grade_hallucinations(combined_docs, initial_generation)
+        except Exception as e:
+            print(f"Error during hallucination grading: {e}")
+            hallucination_grade = "no"
+
         answerGrader = AnswerGrader(self.model)
-        answer_grade = answerGrader.grade_answer(question, initial_generation)
-        
+        try:
+            answer_grade = answerGrader.grade_answer(question, initial_generation)
+        except Exception as e:
+            print(f"Error during answer grading: {e}")
+            answer_grade = "no"
+
         print(f"Initial generation grading - Hallucination: {hallucination_grade}, Answer quality: {answer_grade}")
-        
+
         if hallucination_grade == "no" or answer_grade == "no":
             print("---USING INTROSPECTIVE AGENT FOR COMPLEX QUERY---")
-            
+
             introspective_prompt = f"""
             This is a complex agricultural question that requires careful analysis: {question}
-            
+
             Previous attempt generated: {initial_generation}
-            
+
             Issues identified:
             - Hallucination check: {hallucination_grade}
             - Answer quality: {answer_grade}
-            
+
             Available context:
-            - Original documents: {state["documents"]}
+            - Original documents: {docs_list}
             - Web search results: {web_docs[:2] if web_docs else "None"}
             - Extracted information: {extractions}
-            
+
             Please provide a more accurate and comprehensive answer, ensuring it's grounded in the provided context.
             """
-            
-            introspective_response = self.instropection_agent.chat(introspective_prompt)
-            final_generation = str(introspective_response)
+
+            try:
+                introspective_response = self.introspective_agent.introspect_and_respond(introspective_prompt)
+                final_generation = str(introspective_response)
+            except Exception as e:
+                print(f"Error during introspective agent response: {e}")
+                final_generation = initial_generation
         else:
             final_generation = initial_generation
-        
+
         if len(self.chat_memory) < 5:
             self.chat_memory.append(final_generation)
         else:
             self.chat_memory.pop(0)
             self.chat_memory.append(final_generation)
-            
+
         return {
-            "documents": combined_docs, 
-            "question": question, 
-            "generation": final_generation, 
+            "documents": combined_docs,
+            "question": question,
+            "generation": final_generation,
             "extractions": extractions,
             "workflow_type": "complex",
             "initial_generation": initial_generation,

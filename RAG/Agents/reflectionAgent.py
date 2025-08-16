@@ -59,7 +59,7 @@ class IntrospectiveAgent:
             Provide only the improved final response."""
         )
     
-    def introspect_and_respond(self, question: str, max_iterations: int = 2) -> str:
+    def introspect_and_respond(self, question: str, max_iterations: int = 1) -> str:
         current_response = None
         
         for iteration in range(max_iterations):

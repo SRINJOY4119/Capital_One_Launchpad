@@ -1,6 +1,6 @@
 from pprint import pprint
-from adaptive_rag_class import ADAPTIVE_RAG
-from stategraph import GraphState
+from .adaptive_rag_class import ADAPTIVE_RAG
+from .stategraph import GraphState
 from langgraph.graph import END, StateGraph, START
 import os
     

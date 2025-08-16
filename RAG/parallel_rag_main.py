@@ -15,10 +15,10 @@ cache_base_dir = os.path.join(current_dir, "parallel_cache")
 os.makedirs(cache_base_dir, exist_ok=True)
 
 from dotenv import load_dotenv
-from Internet_checker import Workflow
+from .workflow import Workflow
 from agno.agent import Agent
 from agno.models.google import Gemini
-from document_scorer import FastQuerySummaryScorer
+from .document_scorer import FastQuerySummaryScorer
 
 load_dotenv()
 
@@ -109,7 +109,7 @@ Respond as a trusted advisor who understands both the science and the practical 
         except:
             return file_path.name
     
-    def score_and_select_files(self, question: str, data_files: List[Path], top_k: int = 10) -> List[Path]:
+    def score_and_select_files(self, question: str, data_files: List[Path], top_k: int = 2) -> List[Path]:
         print(f"Scoring {len(data_files)} files against query...")
         
         file_summaries = []
@@ -141,9 +141,7 @@ Respond as a trusted advisor who understands both the science and the practical 
     def run_single_workflow(self, file_path: Path, question: str) -> Dict[str, Any]:
         try:
             print(f"Processing: {file_path.name}")
-            
             workflow_cache_dir = self.setup_workflow_cache(file_path)
-            
             workflow = Workflow(
                 model=self.model, 
                 api_key=self.api_key, 
@@ -151,26 +149,26 @@ Respond as a trusted advisor who understands both the science and the practical 
                 file_path=str(file_path),
                 cache_dir=workflow_cache_dir  
             )
-            
             inputs = {"question": question}
-            
             start_time = time.time()
             result = workflow.run_workflow(inputs)
             end_time = time.time()
-            
+            print("response: ", result)
+            response = result.get('generation', '')
+            extractions = result.get('extractions', '') 
+
             return {
                 "file_name": file_path.name,
                 "file_path": str(file_path),
                 "file_type": file_path.suffix,
                 "success": True,
-                "response": result.get('generation', ''),
+                "response": response,
                 "processing_time": end_time - start_time,
                 "workflow_type": result.get('workflow_type', 'standard'),
-                "extractions": result.get('extractions', ''),
+                "extractions": extractions,
                 "cache_dir": workflow_cache_dir,
                 "error": None
             }
-            
         except Exception as e:
             print(f"❌ Error processing {file_path.name}: {str(e)}")
             return {
@@ -226,38 +224,34 @@ Respond as a trusted advisor who understands both the science and the practical 
     
     def synthesize_results(self, question: str, workflow_results: List[Dict[str, Any]]) -> str:
         successful_results = [r for r in workflow_results if r["success"] and r["response"]]
-        
+
         if not successful_results:
             return "I don't have sufficient information to answer this question comprehensively."
-        
-        synthesis_prompt = f"""
-Based on your extensive agricultural knowledge and expertise, provide a comprehensive answer to this question: {question}
 
-Available information from research and field data:
+        synthesis_prompt = [
+            f"Based on your extensive agricultural knowledge and expertise, provide a comprehensive answer to this question: {question}",
+            "",
+            "Available information from research and field data:",
+            ""
+        ]
 
-"""
-        
         for i, result in enumerate(successful_results, 1):
-            synthesis_prompt += f"""
-Agricultural Information {i}:
-{result['response']}
-
-"""
+            synthesis_prompt.append(f"Agricultural Information {i}:")
+            synthesis_prompt.append(str(result['response']))
             if result['extractions']:
-                synthesis_prompt += f"Key Points: {result['extractions']}\n"
-            
-            synthesis_prompt += "---\n"
-        
-        synthesis_prompt += f"""
+                synthesis_prompt.append(f"Key Points: {result['extractions']}")
+            synthesis_prompt.append("---")
 
-Drawing from this agricultural information and your professional expertise, provide a thorough answer to: "{question}"
+        synthesis_prompt.append("")
+        synthesis_prompt.append(f'Drawing from this agricultural information and your professional expertise, provide a thorough answer to: "{question}"')
+        synthesis_prompt.append("Present your response as if you are sharing your own knowledge and experience, without referencing any external sources or documents. Focus on practical guidance and actionable recommendations.")
 
-Present your response as if you are sharing your own knowledge and experience, without referencing any external sources or documents. Focus on practical guidance and actionable recommendations.
-"""
-        
+        # Join all parts into a single string
+        synthesis_prompt_str = "\n".join(synthesis_prompt)
+
         print("Synthesizing agricultural insights...")
-        synthesized_response = self.synthesizer.run(synthesis_prompt)
-        
+        synthesized_response = self.synthesizer.run(synthesis_prompt_str)
+
         return synthesized_response.content
     
     def process_query(self, question: str, max_workers: int = None) -> Dict[str, Any]:
@@ -270,9 +264,9 @@ Present your response as if you are sharing your own knowledge and experience, w
         all_data_files = self.get_data_files()
         if not all_data_files:
             return {"error": "No data files found"}
-        
-        selected_files = self.score_and_select_files(question, all_data_files, top_k=10)
-        
+
+        selected_files = self.score_and_select_files(question, all_data_files, top_k = 2)
+
         workflow_results = self.run_parallel_workflows(question, selected_files, max_workers)
         
         synthesized_answer = self.synthesize_results(question, workflow_results)
