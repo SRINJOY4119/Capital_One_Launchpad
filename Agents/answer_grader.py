@@ -21,6 +21,7 @@ INSTRUCTIONS:
 - If the answer is mostly correct and relevant, give positive feedback and set decision=True.
 - If the answer is mostly wrong or off-topic, give brief feedback and set decision=False.
 - Be lenient and supportive. Do not over-penalize minor mistakes.
+- If answer says that model doesn't have sufficient information to answer this question comprehensively, then obviously decision will be false
 - Output should be an AnswerGradingResponse object with 'feedback' and 'decision'.
 """,
             response_model=AnswerGradingResponse,

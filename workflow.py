@@ -34,7 +34,11 @@ adapter_dir = "./models/Qwen_1.5_Finetuned"
 hf_model = None
 
 if not internet_checker.is_connected():
+    print("Offline mode detected. Using HF Model for inference.")
     hf_model = HFModel(base_model_dir, adapter_dir)
+
+else: 
+    print("Online mode detected")
 
 crop_recommender_agent = CropRecommenderAgent()
 weather_forecast_agent = WeatherForecastAgent()
