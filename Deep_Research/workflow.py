@@ -17,10 +17,10 @@ from reportlab.lib.units import inch
 from reportlab.lib.enums import TA_LEFT, TA_CENTER, TA_JUSTIFY
 import textwrap
 
-from planner_agent import AgriculturalPlanningAgent
-from SubsearchAgent import EnhancedSubsearchAgent
-from citations_agent import EnhancedCitationAgent
-from report_agent import EnhancedReportAgent
+from .planner_agent import AgriculturalPlanningAgent
+from .SubsearchAgent import EnhancedSubsearchAgent
+from .citations_agent import EnhancedCitationAgent
+from .report_agent import EnhancedReportAgent
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)

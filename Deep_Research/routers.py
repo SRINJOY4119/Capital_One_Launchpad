@@ -2,7 +2,7 @@ from fastapi import APIRouter, HTTPException, Query
 from typing import List, Optional
 from Deep_Research.workflow import DeepResearchWorkflow
 
-router = APIRouter(prefix="/api/v1/", tags=["Deep Research"])
+router = APIRouter(prefix="/api/v1", tags=["Deep Research"])
 workflow = DeepResearchWorkflow()
 
 @router.post("/deep-research/")

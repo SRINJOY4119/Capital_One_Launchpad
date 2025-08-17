@@ -1,7 +1,7 @@
 from PIL import Image, UnidentifiedImageError
-from transformers import ViTFeatureExtractor, ViTForImageClassification
+from transformers import ViTImageProcessor, ViTForImageClassification
 
-feature_extractor = ViTFeatureExtractor.from_pretrained('wambugu71/crop_leaf_diseases_vit')
+image_processor = ViTImageProcessor.from_pretrained('wambugu71/crop_leaf_diseases_vit')
 model = ViTForImageClassification.from_pretrained(
     'wambugu1738/crop_leaf_diseases_vit',
     ignore_mismatched_sizes=True
@@ -10,7 +10,7 @@ model = ViTForImageClassification.from_pretrained(
 def detect_crop_disease(image_path: str):
     try:
         image = Image.open(image_path)
-        inputs = feature_extractor(images=image, return_tensors="pt")
+        inputs = image_processor(images=image, return_tensors="pt")
         outputs = model(**inputs)
         logits = outputs.logits
         probs = logits.softmax(dim=-1).detach().cpu().numpy()[0]

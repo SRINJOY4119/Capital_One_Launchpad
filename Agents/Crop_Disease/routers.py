@@ -1,4 +1,4 @@
-from fastapi import APIRouter, UploadFile, File, HTTPException
+from fastapi import APIRouter, UploadFile, File, HTTPException, Form
 import os
 import shutil
 from .agent import CropDiseaseAgent
@@ -18,19 +18,31 @@ UPLOAD_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".."
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 @router.post("/detect", response_model=CropDiseaseDetectionResponse)
-async def detect_disease(image: UploadFile = File(...)):
+async def detect_disease(
+    image: UploadFile = File(None),
+    query: str = Form("describe the diseases")
+):
     try:
-        file_ext = os.path.splitext(image.filename)[-1]
-        temp_path = os.path.join(UPLOAD_DIR, image.filename)
-        with open(temp_path, "wb") as buffer:
-            shutil.copyfileobj(image.file, buffer)
         agent = get_agent()
-        result = agent.analyze_disease(temp_path)
-        disease_name = result.disease_name
-        disease_probability = result.disease_probability
-        symptoms = result.symptoms
-        treatments = result.Treatments
-        prevention_tips = result.prevention_tips
+        temp_path = None
+        
+        if image:
+            file_ext = os.path.splitext(image.filename)[-1]
+            temp_path = os.path.join(UPLOAD_DIR, image.filename)
+            with open(temp_path, "wb") as buffer:
+                shutil.copyfileobj(image.file, buffer)
+        
+        result = agent.analyze_disease(query=query, image_path=temp_path)
+        
+        disease_name = result.disease_name if result.disease_name else []
+        disease_probability = result.disease_probability if result.disease_probability else []
+        symptoms = result.symptoms if result.symptoms else []
+        treatments = result.Treatments if result.Treatments else []
+        prevention_tips = result.prevention_tips if result.prevention_tips else []
+        
+        if temp_path and os.path.exists(temp_path):
+            os.remove(temp_path)
+        
         return CropDiseaseDetectionResponse(
             success=True,
             diseases=disease_name,
@@ -41,13 +53,16 @@ async def detect_disease(image: UploadFile = File(...)):
             image_path=temp_path
         )
     except Exception as e:
+        if temp_path and os.path.exists(temp_path):
+            os.remove(temp_path)
+        
         return CropDiseaseDetectionResponse(
             success=False,
-            diseases=None,
-            disease_probabilities=None,
-            symptoms=None,
-            Treatments=None,
-            prevention_tips=None,
+            diseases=[],
+            disease_probabilities=[],
+            symptoms=[],
+            Treatments=[],
+            prevention_tips=[],
             image_path=None,
             error=f"Failed to detect crop disease: {str(e)}"
         )
