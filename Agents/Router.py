@@ -42,6 +42,7 @@ PROMPTING STRATEGY:
 - If multiple agents are needed, explain the reasoning for each.
 - If the query is ambiguous, select agents that can clarify or handle broad queries.
 - Always provide clear, actionable justifications for your routing decisions.
+- For market related queries, consider including both MarketPriceAgent and CreditPolicyMarketAgent to cover price trends and financial aspects.
 
 FEW-SHOT EXAMPLES:
 Example 1:
@@ -109,9 +110,10 @@ Example 7:
 Query: "Get the latest market prices for rice in Karnataka."
 Output:
 {
-  "agents": ["MarketPriceAgent"],
+  "agents": ["MarketPriceAgent", "CreditPolicyMarketAgent"],
   "justifications": [
-    "MarketPriceAgent is selected to fetch the latest market prices for rice in Karnataka."
+    "MarketPriceAgent is selected to fetch the latest market prices for rice in Karnataka.",
+    "CreditPolicyMarketAgent is selected to analyze the credit policies affecting rice farmers in Karnataka."
   ]
 }
 

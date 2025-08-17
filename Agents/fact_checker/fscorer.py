@@ -4,7 +4,7 @@ from typing import Tuple, List
 from agno.agent import Agent
 from agno.models.google import Gemini
 from agno.tools.tavily import TavilyTools
-from agno.tools.arxiv import ArxivTools
+from agno.tools.baidusearch import BaiduSearchTools
 from dotenv import load_dotenv
 from pydantic import BaseModel, Field
 
@@ -22,7 +22,7 @@ class LikertScorer:
     def __init__(self, model_id="gemini-2.0-flash"):
         self.agent = Agent(
             model=Gemini(id=model_id),
-            tools=[TavilyTools(), ArxivTools()],
+            tools=[TavilyTools(), BaiduSearchTools()],
             show_tool_calls=True,
             markdown=True,
             response_model=FactCheckResult,
@@ -37,6 +37,8 @@ Use a 5-point Likert scale for fact accuracy assessment:
 **3 - Partially Accurate**: The statement has both accurate and inaccurate elements in roughly equal measure
 **4 - Mostly Accurate**: The statement is largely correct with minor inaccuracies or omissions
 **5 - Completely Accurate**: The statement is entirely factual and aligns perfectly with established facts
+
+- If you are getting confused, then mark it factually correct.
 
 **EVALUATION CRITERIA:**
 
@@ -61,20 +63,12 @@ Use a 5-point Likert scale for fact accuracy assessment:
 - Consider the severity of inaccuracies when scoring
 - Use search tools for verification when uncertain about facts
 - Focus on factual accuracy, not opinion or interpretation
-- Provide clear reasoning for your assessment"""
+- Provide clear reasoning for your assessment
+- If you are not getting sufficient information from the provided fact and search tools, then it is factually correct 
+"""
         )
     
     def score_text(self, text: str, fact: str) -> Tuple[FactCheckResult, int]:
-        """
-        Score the accuracy of text against a reference fact using Likert scale.
-        
-        Args:
-            text: The statement to be evaluated
-            fact: The reference fact to compare against
-            
-        Returns:
-            Tuple of (FactCheckResult, token_count)
-        """
         prompt = f"""
 Please evaluate the factual accuracy of the following statement against the provided reference fact:
 

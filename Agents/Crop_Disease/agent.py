@@ -6,6 +6,8 @@ from pathlib import Path
 from agno.models.google import Gemini
 from dotenv import load_dotenv
 from pydantic import BaseModel
+from typing import Optional
+
 current_dir = os.path.dirname(os.path.abspath(__file__))
 parent_dir = os.path.dirname(current_dir)
 project_root = os.path.dirname(parent_dir)
@@ -19,11 +21,11 @@ load_dotenv()
 
 
 class CropDiseaseOutput(BaseModel):
-    disease_name: list[str]
-    disease_probability: list[float]
-    symptoms: list[str]
-    Treatments: list[str]
-    prevention_tips: list[str]
+    disease_name: Optional[list[str]]
+    disease_probability: Optional[list[float]]
+    symptoms: Optional[list[str]]
+    Treatments: Optional[list[str]]
+    prevention_tips: Optional[list[str]]
 
 class CropDiseaseAgent:
     def __init__(self, model_id="gemini-2.0-flash"):
@@ -38,6 +40,8 @@ class CropDiseaseAgent:
             response_model=CropDiseaseOutput,
             instructions="""
 You are an advanced crop disease analysis agent. Your task is to analyze crop images for disease symptoms and provide a clear diagnosis and actionable recommendations.
+
+If image is not provided then no need to provide disease name and disease probability, provide other things
 
 PROMPTING STRATEGY:
 - When an image is provided, first attempt to identify the disease using your own analysis.
@@ -58,10 +62,26 @@ OUTPUT REQUIREMENTS:
 """
         )
 
-    def analyze_disease(self, image_path):
-        image = Image(filepath=Path(image_path))
-        prompt = "Analyze this crop image for disease symptoms and provide diagnosis, justification, and recommendations."
-        result = self.agent.run(prompt, images=[image]).content
+    def analyze_disease(self, query: str, image_path=None):
+        prompt = f"Analyze this crop image for disease symptoms and provide diagnosis, justification, and recommendations : {query}"
+        if image_path and os.path.exists(image_path):
+            from agno.media import Image
+            image = Image(filepath=Path(image_path))
+            result = self.agent.run(prompt, images=[image]).content
+        else:
+            prompt = (
+                "No image provided. Analyze the crop disease based on context only. "
+                f"Do not provide disease name or probability, only give symptoms, treatments, prevention tips, and monitoring advice for this {query}"
+            )
+            result = self.agent.run(prompt).content
+        if (
+            hasattr(result, "disease_name") and hasattr(result, "disease_probability")
+            and hasattr(result, "symptoms") and hasattr(result, "Treatments")
+            and hasattr(result, "prevention_tips")
+            and not result.disease_name and not result.disease_probability
+            and not result.symptoms and not result.Treatments and not result.prevention_tips
+        ):
+            print("Agent CropDiseaseDetectionAgent Response: All outputs are empty. Likely an error in detection or input.")
         return result
 
 if __name__ == "__main__":
