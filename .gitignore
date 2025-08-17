@@ -3,3 +3,5 @@ __pycache__/
 myenv
 .venv
 .DS_Store
+Qwen_1.5_Finetuned
+Qwen1.5-Base

@@ -25,6 +25,16 @@ from Agents.Risk_Management.agent import AgriculturalRiskAnalysisAgent
 from Agents.Web_Scrapping.agent import AgriculturalWebScrappingAgent
 from Agents.Crop_Yield.agent import CropYieldAssistant
 from Agents.Query_rewriter import QueryRewriterAgent
+from utils.Internet_checker import InternetChecker
+from utils.hf_model import HFModel
+
+internet_checker = InternetChecker()
+base_model_dir = "./models/Qwen1.5-Base"
+adapter_dir = "./models/Qwen_1.5_Finetuned"
+hf_model = None
+
+if not internet_checker.is_connected():
+    hf_model = HFModel(base_model_dir, adapter_dir)
 
 crop_recommender_agent = CropRecommenderAgent()
 weather_forecast_agent = WeatherForecastAgent()
@@ -336,6 +346,17 @@ hybrid_workflow_graph = build_hybrid_workflow_graph()
 compiled_hybrid_graph = hybrid_workflow_graph.compile()
 
 def run_workflow(query: str, mode: str = "rag", image_path: str = None) -> Dict[str, Any]:
+    if not internet_checker.is_connected() and hf_model:
+        hf_response = hf_model.infer(query)
+        return {
+            "answer": hf_response,
+            "answer_quality_grade": {"is_good_answer": True, "reasoning": "Offline mode - HF Model response"},
+            "is_answer_complete": True,
+            "final_mode": "offline",
+            "switched_modes": False,
+            "is_image_query": image_path is not None
+        }
+    
     is_image_query = image_path is not None
     
     state = MainWorkflowState(

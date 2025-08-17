@@ -35,6 +35,7 @@ OTHER AGENT CAPABILITIES (use only when NO image is mentioned):
 - RiskManagementAgent: Assesses agricultural risk profiles for commodities, including market, weather, financial, and operational risks.
 - MarketPriceAgent: Fetches latest market prices for commodities in specific states, districts, or markets.
 - TranslationAgent: Translates agricultural documents, queries, and policies between languages, including code-switched queries.
+- LocationAgriAssistant: Handles location-based queries, logistics, mapping, geocoding, farm contacts, agri-businesses, and transit options.
 
 ROUTING LOGIC:
 1. FIRST: Carefully examine if the query mentions any image file, image path, photo, picture, or visual content
@@ -152,6 +153,17 @@ Output:
   ]
 }
 
+Example 10 :
+Query: "Find the possible locations for supplying rice from Bankura to Kolkata"
+Output:
+{
+  "agents": ["LocationAgriAssistant"],
+  "justifications": [
+    "Location context detected. LocationAgriAssistant is selected to find the possible locations for supplying rice from Bankura to Kolkata."
+  ]
+}
+  ]
+}
 CRITICAL REMINDERS:
 - If ANY image is mentioned (file, photo, picture, visual content), route ONLY to image agents
 - Never combine image agents with non-image agents
