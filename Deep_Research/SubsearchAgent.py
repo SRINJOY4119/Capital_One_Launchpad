@@ -1,252 +1,277 @@
+import os
+import sys
+import asyncio
+import threading
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from typing import Dict, List, Any, Optional, Tuple
+from dataclasses import dataclass
+from datetime import datetime
+import logging
+
+current_dir = os.path.dirname(os.path.abspath(__file__))
+parent_dir = os.path.dirname(current_dir)
+sys.path.append(parent_dir)
+
 from agno.agent import Agent
-from agno.models.groq import Groq
-from agno.team.team import Team
+from agno.models.google import Gemini
 from agno.tools.arxiv import ArxivTools
 from agno.tools.wikipedia import WikipediaTools
 from agno.tools.tavily import TavilyTools
+from Tools.fetchWeatherForecast import get_google_weather_forecast
+from Tools.getCropRecommendation import get_crop_recommendation
+from Tools.pest_prediction import detect_pests
+from Tools.risk_management import get_agricultural_risk_metrics
 from dotenv import load_dotenv
-import json
-from typing import Dict, List, Any, Optional
-from textwrap import dedent
-import asyncio
 
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 load_dotenv()
 
-# Main 3 Agents
-arxiv_agent = Agent(
-    name="ArXiv Research Agent",
-    role="Academic papers and scholarly research specialist",
-    model=Groq(id="llama-3.3-70b-versatile"),
-    tools=[ArxivTools()],
-    instructions=dedent("""
-    You are the ArXiv Research Agent specializing in academic papers and scholarly publications.
-    
-    YOUR ROLE:
-    - Search and analyze ArXiv papers
-    - Focus on recent research and developments
-    - Provide detailed paper summaries
-    - Identify key research trends
-    
-    IMPORTANT:
-    - Remove all emojis from responses
-    - Use professional academic tone
-    - Focus on your ArXiv research expertise
-    - Complete your research independently
-    - Do not try to coordinate other agents
-    """),
-)
+@dataclass
+class SearchResult:
+    agent_name: str
+    query: str
+    content: str
+    success: bool
+    execution_time: float
+    sources_found: int = 0
+    error_message: Optional[str] = None
 
-wikipedia_agent = Agent(
-    name="Wikipedia Knowledge Agent", 
-    role="Foundational knowledge and background information specialist",
-    model=Groq(id="llama-3.3-70b-versatile"),
-    tools=[WikipediaTools()],
-    instructions=dedent("""
-    You are the Wikipedia Knowledge Agent specializing in foundational knowledge and context.
-    
-    YOUR ROLE:
-    - Provide encyclopedic knowledge and definitions
-    - Give historical context and background
-    - Explain fundamental concepts
-    - Verify factual information
-    
-    IMPORTANT:
-    - Remove all emojis from responses
-    - Use clear, informative tone
-    - Focus on your Wikipedia knowledge expertise
-    - Complete your research independently
-    - Do not try to coordinate other agents
-    """),
-)
-
-tavily_agent = Agent(
-    name="Web Intelligence Agent",
-    role="Current web information and market intelligence specialist", 
-    model=Groq(id="llama-3.3-70b-versatile"),
-    tools=[TavilyTools()],
-    instructions=dedent("""
-    You are the Web Intelligence Agent specializing in current web information and developments.
-    
-    YOUR ROLE:
-    - Search current web information via Tavily
-    - Focus on recent developments and trends
-    - Gather market intelligence and news
-    - Provide real-time insights
-    
-    IMPORTANT:
-    - Remove all emojis from responses
-    - Use professional analytical tone
-    - Focus on your web research expertise
-    - Complete your research independently
-    - Do not try to coordinate other agents
-    """),
-)
-
-# One Main Research Team
-research_team = Team(
-    name="Multi-Agent Research Team",
-    mode="sequential",
-    model=Groq(id="llama-3.3-70b-versatile"),
-    members=[
-        wikipedia_agent,      # First: Get foundational knowledge
-        arxiv_agent,         # Second: Get academic research
-        tavily_agent,        # Third: Get current developments
-    ],
-    instructions=[
-        "You are a comprehensive research team with 3 specialized agents.",
-        "Each agent focuses on their specialty area and provides complete analysis.",
-        "Wikipedia Agent: Provide foundational knowledge and context first.",
-        "ArXiv Agent: Then provide academic research and papers.",
-        "Tavily Agent: Finally provide current web developments and trends.",
-        "Remove all emojis and maintain professional tone.",
-        "Each agent works independently - no coordination between agents.",
-    ],
-    show_tool_calls=False,
-    markdown=True,
-)
-
-class ResearchCoordinator:
-    """Simple coordinator with one team and three agents"""
-    
-    def __init__(self):
-        self.team = research_team
-        self.arxiv_agent = arxiv_agent
-        self.wikipedia_agent = wikipedia_agent 
-        self.tavily_agent = tavily_agent
+class EnhancedSubsearchAgent:
+    def __init__(self, max_workers: int = 3):
+        self.max_workers = max_workers
+        self.agents = self._initialize_agents()
         
-    def search(self, query: str, context: Optional[str] = None) -> Dict[str, Any]:
-        """Main research method using the team"""
-        print("🔍 Starting research with Multi-Agent Research Team...")
+    def _initialize_agents(self) -> Dict[str, Agent]:
+        common_tools = [
+            get_google_weather_forecast, 
+            get_crop_recommendation, 
+            detect_pests, 
+            get_agricultural_risk_metrics
+        ]
         
-        try:
-            # Prepare the research query
-            research_query = self._prepare_query(query, context)
-            
-            # Run the team research
-            response = self.team.run(research_query)
-            
-            return {
-                "success": True,
-                "content": response.content if hasattr(response, 'content') else str(response),
-                "query": query,
-                "team_name": "Multi-Agent Research Team",
-                "agents_used": ["Wikipedia Agent", "ArXiv Agent", "Tavily Agent"],
-                "approach": "sequential_team_research"
-            }
-            
-        except Exception as e:
-            print(f"❌ Team research failed: {str(e)}")
-            return self._fallback_search(query, context, str(e))
-    
-    def search_individual(self, query: str, agent_type: str, context: Optional[str] = None) -> Dict[str, Any]:
-        """Search using individual agent (fallback or specific needs)"""
         agents = {
-            "arxiv": self.arxiv_agent,
-            "wikipedia": self.wikipedia_agent,
-            "tavily": self.tavily_agent
+            "arxiv": Agent(
+                name="ArXiv Research Specialist",
+                role="Academic research and scientific papers",
+                model=Gemini(id="gemini-2.0-flash"),
+                tools=[ArxivTools()] + common_tools,
+                instructions="""
+                You are the ArXiv Research Specialist focusing on academic agricultural research.
+                - Search and analyze recent academic papers
+                - Provide comprehensive literature reviews
+                - Focus on peer-reviewed research and citations
+                - Extract key findings and methodologies
+                - Identify research gaps and trends
+                Complete your analysis independently with detailed academic insights.
+                """
+            ),
+            
+            "wikipedia": Agent(
+                name="Knowledge Base Specialist", 
+                role="Foundational knowledge and context",
+                model=Gemini(id="gemini-2.0-flash"),
+                tools=[WikipediaTools()] + common_tools,
+                instructions="""
+                You are the Knowledge Base Specialist providing foundational agricultural knowledge.
+                - Provide comprehensive background information
+                - Explain fundamental concepts and definitions
+                - Give historical context and established facts
+                - Cross-reference information for accuracy
+                - Build knowledge foundation for complex topics
+                Complete your research independently with authoritative sources.
+                """
+            ),
+            
+            "tavily": Agent(
+                name="Current Intelligence Specialist",
+                role="Real-time information and market intelligence", 
+                model=Gemini(id="gemini-2.0-flash"),
+                tools=[TavilyTools()] + common_tools,
+                instructions="""
+                You are the Current Intelligence Specialist for real-time agricultural information.
+                - Search current web developments and news
+                - Provide market intelligence and trends
+                - Find recent policy changes and regulations
+                - Gather real-time agricultural data and statistics
+                - Monitor emerging technologies and practices
+                Complete your analysis independently with current, actionable insights.
+                """
+            )
         }
         
-        if agent_type not in agents:
-            return {
-                "success": False,
-                "error": f"Unknown agent type: {agent_type}. Available: {list(agents.keys())}",
-                "query": query
-            }
-        
-        print(f"🔍 Starting research with {agent_type.title()} Agent...")
+        return agents
+
+    def _execute_single_search(self, agent_name: str, query: str, context: Optional[str] = None) -> SearchResult:
+        start_time = datetime.now()
+        agent = self.agents[agent_name]
         
         try:
-            agent = agents[agent_type]
-            research_query = self._prepare_query(query, context)
+            research_query = self._prepare_query(query, context, agent_name)
             response = agent.run(research_query)
             
-            return {
-                "success": True,
-                "content": response.content if hasattr(response, 'content') else str(response),
-                "query": query,
-                "agent_name": agent.name,
-                "agent_type": agent_type,
-                "approach": "individual_agent_research"
-            }
+            content = response.content if hasattr(response, 'content') else str(response)
+            execution_time = (datetime.now() - start_time).total_seconds()
+            
+            sources_count = self._count_sources(content)
+            
+            return SearchResult(
+                agent_name=agent_name,
+                query=query,
+                content=content,
+                success=True,
+                execution_time=execution_time,
+                sources_found=sources_count
+            )
             
         except Exception as e:
-            return {
-                "success": False,
-                "error": str(e),
-                "query": query,
-                "agent_type": agent_type
-            }
-    
-    def _prepare_query(self, query: str, context: Optional[str] = None) -> str:
-        """Prepare the research query"""
-        research_query = f"Research Topic: {query}\n\n"
+            execution_time = (datetime.now() - start_time).total_seconds()
+            logger.error(f"Search failed for {agent_name}: {str(e)}")
+            
+            return SearchResult(
+                agent_name=agent_name,
+                query=query,
+                content="",
+                success=False,
+                execution_time=execution_time,
+                error_message=str(e)
+            )
+
+    def _prepare_query(self, query: str, context: Optional[str], agent_name: str) -> str:
+        base_query = f"Agricultural Research Query: {query}\n\n"
         
         if context:
-            research_query += f"Additional Context: {context}\n\n"
+            base_query += f"Context: {context}\n\n"
+        
+        agent_specific_instructions = {
+            "arxiv": "Focus on academic papers, research methodologies, and peer-reviewed findings.",
+            "wikipedia": "Provide foundational knowledge, definitions, and established facts.",
+            "tavily": "Find current developments, market trends, and real-time data."
+        }
+        
+        base_query += f"Instructions for {agent_name}:\n"
+        base_query += agent_specific_instructions.get(agent_name, "Provide comprehensive analysis.")
+        base_query += "\n\nProvide detailed analysis with sources, key findings, and actionable insights."
+        
+        return base_query
+
+    def _count_sources(self, content: str) -> int:
+        source_indicators = ['http', 'doi:', 'source:', 'reference:', 'cited', 'published']
+        return sum(1 for indicator in source_indicators if indicator.lower() in content.lower())
+
+    def search_parallel(self, queries: List[str], context: Optional[str] = None) -> List[SearchResult]:
+        all_results = []
+        
+        with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
+            futures = []
             
-        research_query += """Instructions:
-- Conduct thorough research on this topic using your specialized tools
-- Provide comprehensive analysis and insights
-- Include relevant sources and evidence
-- Focus on accuracy and depth
-- Use professional tone without emojis
-- Work independently and complete your analysis"""
+            for query in queries:
+                for agent_name in self.agents.keys():
+                    future = executor.submit(self._execute_single_search, agent_name, query, context)
+                    futures.append(future)
+            
+            for future in as_completed(futures):
+                try:
+                    result = future.result(timeout=120)
+                    all_results.append(result)
+                    logger.info(f"Completed search: {result.agent_name} - {result.query[:50]}...")
+                except Exception as e:
+                    logger.error(f"Future execution failed: {str(e)}")
         
-        return research_query
-    
-    def _fallback_search(self, query: str, context: Optional[str], error: str) -> Dict[str, Any]:
-        """Fallback to individual agents if team fails"""
-        print("🔄 Team failed, trying fallback with individual agents...")
+        return all_results
+
+    def search_sequential(self, queries: List[str], context: Optional[str] = None) -> List[SearchResult]:
+        all_results = []
         
-        results = []
+        for query in queries:
+            logger.info(f"Processing query: {query}")
+            
+            for agent_name in self.agents.keys():
+                result = self._execute_single_search(agent_name, query, context)
+                all_results.append(result)
+                
+                if result.success:
+                    logger.info(f"Success {agent_name}: Found {result.sources_found} sources")
+                else:
+                    logger.warning(f"Failed {agent_name}: Search failed")
         
-        # Try each agent individually
-        for agent_type in ["wikipedia", "arxiv", "tavily"]:
-            result = self.search_individual(query, agent_type, context)
-            if result["success"]:
-                results.append(f"**{agent_type.title()} Agent Results:**\n{result['content']}\n")
+        return all_results
+
+    def search_optimized(self, queries: List[str], context: Optional[str] = None, 
+                        parallel: bool = True) -> Dict[str, Any]:
+        start_time = datetime.now()
         
-        if results:
-            combined_content = "\n".join(results)
-            return {
-                "success": True,
-                "content": combined_content,
-                "query": query,
-                "team_name": "Fallback Individual Agents",
-                "agents_used": ["Wikipedia Agent", "ArXiv Agent", "Tavily Agent"],
-                "approach": "fallback_individual_research",
-                "original_error": error
-            }
+        if parallel and len(queries) > 1:
+            results = self.search_parallel(queries, context)
+            approach = "parallel_execution"
         else:
-            return {
-                "success": False,
-                "error": f"Both team and individual agents failed. Original error: {error}",
-                "query": query
-            }
-    
-
-
-# Example usage
-if __name__ == "__main__":
-    # Initialize coordinator
-    coordinator = ResearchCoordinator()
-    
-    # Research query
-    query = "sustainable agriculture AI technologies 2024"
-    
-    print("Starting research...")
-    
-    # Perform research
-    result = coordinator.search(query)
-    
-    if result["success"]:
-        print("Research completed successfully!")
-        print("\nResults:")
-        print("-" * 50)
-        print(result['content'])
+            results = self.search_sequential(queries, context)
+            approach = "sequential_execution"
         
-    else:
-        print("Research failed:")
-        print(f"Error: {result['error']}")
-    
-    print("\nDone!")
+        total_time = (datetime.now() - start_time).total_seconds()
+        
+        successful_results = [r for r in results if r.success]
+        failed_results = [r for r in results if not r.success]
+        
+        combined_content = self._combine_results(successful_results)
+        
+        return {
+            "success": len(successful_results) > 0,
+            "approach": approach,
+            "total_execution_time": total_time,
+            "queries_processed": len(queries),
+            "successful_searches": len(successful_results),
+            "failed_searches": len(failed_results),
+            "total_sources_found": sum(r.sources_found for r in successful_results),
+            "combined_content": combined_content,
+            "detailed_results": successful_results,
+            "errors": [{"agent": r.agent_name, "query": r.query, "error": r.error_message} 
+                      for r in failed_results],
+            "performance_metrics": self._calculate_performance_metrics(results)
+        }
+
+    def _combine_results(self, results: List[SearchResult]) -> str:
+        if not results:
+            return "No successful search results found."
+        
+        combined = f"# Comprehensive Agricultural Research Results\n"
+        combined += f"*Generated from {len(results)} successful searches*\n\n"
+        
+        by_agent = {}
+        for result in results:
+            if result.agent_name not in by_agent:
+                by_agent[result.agent_name] = []
+            by_agent[result.agent_name].append(result)
+        
+        for agent_name, agent_results in by_agent.items():
+            combined += f"## {agent_name.title()} Research Findings\n\n"
+            
+            for result in agent_results:
+                combined += f"### Query: {result.query}\n"
+                combined += f"**Sources Found:** {result.sources_found} | **Time:** {result.execution_time:.2f}s\n\n"
+                combined += f"{result.content}\n\n"
+                combined += "---\n\n"
+        
+        return combined
+
+    def _calculate_performance_metrics(self, results: List[SearchResult]) -> Dict[str, float]:
+        if not results:
+            return {}
+        
+        successful = [r for r in results if r.success]
+        
+        return {
+            "success_rate": len(successful) / len(results) * 100,
+            "average_execution_time": sum(r.execution_time for r in results) / len(results),
+            "average_sources_per_search": sum(r.sources_found for r in successful) / len(successful) if successful else 0,
+            "fastest_search": min(r.execution_time for r in results),
+            "slowest_search": max(r.execution_time for r in results)
+        }
+
+    def execute_parallel_research(self, research_queries: List[str], context: Optional[str] = None) -> Dict[str, Any]:
+        """Execute parallel research across multiple queries and return comprehensive results"""
+        return self.search_optimized(research_queries, context, parallel=True)
+
+    def search(self, queries: List[str], context: Optional[str] = None, 
+              parallel: bool = True) -> Dict[str, Any]:
+        return self.search_optimized(queries, context, parallel)
