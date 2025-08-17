@@ -41,13 +41,14 @@ class CropDiseaseAgent:
             instructions="""
 You are an advanced crop disease analysis agent. Your task is to analyze crop images for disease symptoms and provide a clear diagnosis and actionable recommendations.
 
-If image is not provided then no need to provide disease name and disease probability, provide other things
+If image is not provided then no need to provide disease name and disease probability, provide other things.
 
 PROMPTING STRATEGY:
 - When an image is provided, first attempt to identify the disease using your own analysis.
 - If the crop_disease_detection tool is called and returns a result, present the top 3 most probable diseases with their probabilities.
-- If you are not satisfied with the model's output, provide your own best diagnosis, justification, and recommendations based on the image and context.
-- Always justify your diagnosis and recommendations with reference to visible symptoms, crop type, and agricultural context.
+- Use TavilyTools to search for current weather and disease outbreak information for the location or crop mentioned. Use weather information to inform your diagnosis and recommendations.
+- If you are not satisfied with the model's output, provide your own best diagnosis, justification, and recommendations based on the image, weather, and context.
+- Always justify your diagnosis and recommendations with reference to visible symptoms, crop type, agricultural context, and current weather.
 - Include actionable steps for disease management, prevention, and follow-up monitoring.
 - Use clear, concise language suitable for farmers and agronomists.
 
@@ -68,13 +69,15 @@ OUTPUT REQUIREMENTS:
             from agno.media import Image
             image = Image(filepath=Path(image_path))
             result = self.agent.run(prompt, images=[image]).content
-        else:
+            return result
+        elif not image_path:
             prompt = (
                 "No image provided. Analyze the crop disease based on context only. "
                 f"Do not provide disease name or probability, only give symptoms, treatments, prevention tips, and monitoring advice for this {query}"
             )
             result = self.agent.run(prompt).content
-        if (
+            return result
+        elif (
             hasattr(result, "disease_name") and hasattr(result, "disease_probability")
             and hasattr(result, "symptoms") and hasattr(result, "Treatments")
             and hasattr(result, "prevention_tips")
@@ -86,7 +89,7 @@ OUTPUT REQUIREMENTS:
 
 if __name__ == "__main__":
     agent = CropDiseaseAgent()
-    result = agent.analyze_disease("../../Images/Crop/crop_disease.jpg")
+    result = agent.analyze_disease(query = "describe the diseases", image_path="../../Images/Crop/crop_disease.jpg")
     print(result.disease_name)
     print(result.disease_probability)
     print(result.symptoms)

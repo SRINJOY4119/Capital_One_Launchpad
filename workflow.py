@@ -23,12 +23,14 @@ from Agents.Multi_Lingual.agent import MultiLanguageTranslator
 from Agents.Pest_prediction.agent import PestPredictionAgent
 from Agents.Risk_Management.agent import AgriculturalRiskAnalysisAgent
 from Agents.Web_Scrapping.agent import AgriculturalWebScrappingAgent
+from Agents.Crop_Yield.agent import CropYieldAssistant
 from Agents.Query_rewriter import QueryRewriterAgent
 
 crop_recommender_agent = CropRecommenderAgent()
 weather_forecast_agent = WeatherForecastAgent()
 location_agri_assistant = LocationAgriAssistant()
 news_agent = NewsAgent()
+crop_yield_assistant = CropYieldAssistant()
 credit_policy_market_agent = CreditPolicyMarketAgent()
 answer_grader_agent = AnswerGraderAgent()
 synthesizer_agent = SynthesizerAgent()
@@ -44,6 +46,7 @@ query_rewriter_agent = QueryRewriterAgent()
 
 class MainWorkflowState(TypedDict):
     query: str
+    image_path: str
     initial_mode: str
     current_mode: str
     rag_response: str
@@ -58,15 +61,21 @@ class MainWorkflowState(TypedDict):
     extractions: str
     documents: List[str]
     has_switched_mode: bool
+    is_image_query: bool
 
 def run_adaptive_rag(query: str) -> str:
     rag_system = ParallelRAGSystem(model="gemini-2.0-flash", k=3)
     result = rag_system.process_query(query)
     return result.get("synthesized_answer", "")
 
-def run_router_agent(query: str) -> Dict[str, Any]:
+def run_router_agent(query: str, image_path: str = None) -> Dict[str, Any]:
     router = RouterAgent()
-    routing_decision = router.route(query)
+    if image_path:
+        query_with_image = f"{query} [IMAGE_PROVIDED]"
+        routing_decision = router.route(query_with_image)
+    else:
+        routing_decision = router.route(query)
+    
     if hasattr(routing_decision, 'agents'):
         agents = routing_decision.agents
     elif isinstance(routing_decision, dict):
@@ -75,7 +84,7 @@ def run_router_agent(query: str) -> Dict[str, Any]:
         agents = []
     return {"agents": agents, "routing_decision": routing_decision}
 
-def call_agent(agent_name: str, query: str) -> Any:
+def call_agent(agent_name: str, query: str, image_path: str = None) -> Any:
     if agent_name == "CropRecommenderAgent":
         return crop_recommender_agent.respond(query)
     elif agent_name == "WeatherForecastAgent":
@@ -91,11 +100,11 @@ def call_agent(agent_name: str, query: str) -> Any:
     elif agent_name == "SynthesizerAgent":
         return synthesizer_agent.synthesize(query.get("responses", []))
     elif agent_name == "CropDiseaseDetectionAgent":
-        return crop_disease_agent.analyze_disease(query)
+        return crop_disease_agent.analyze_disease(query = "Analyze this crop image for disease symptoms", image_path=image_path)
     elif agent_name == "FactCheckerAgent":
         return fact_checker_agent.score(query)
     elif agent_name == "ImageAnalysisAgent":
-        return image_analysis_agent.analyze(query)
+        return image_analysis_agent.describe_image(image_path)
     elif agent_name == "MarketPriceAgent":
         return market_price_agent.chat(query)
     elif agent_name == "MultiLanguageTranslatorAgent":
@@ -106,14 +115,14 @@ def call_agent(agent_name: str, query: str) -> Any:
         return risk_management_agent.assess(query)
     elif agent_name == "WebScrapingAgent":
         return web_scraping_agent.scrape(query)
+    elif agent_name == "CropYieldAgent":
+        return crop_yield_assistant.respond(query)
     else:
         return f"No implementation for agent: {agent_name}"
 
-
-
-def call_agent_simple(agent_name: str, query: str) -> Dict[str, Any]:
+def call_agent_simple(agent_name: str, query: str, image_path: str = None) -> Dict[str, Any]:
     try:
-        agent_response = call_agent(agent_name, query)
+        agent_response = call_agent(agent_name, query, image_path)
         
         return {
             "agent_name": agent_name,
@@ -130,7 +139,7 @@ def grade_answer(question: str, answer: str) -> Dict[str, Any]:
         grade_result = answer_grader_agent.grade(question, answer)
         print(f"Answer Grader Response: {grade_result}")
         return {
-            "grade": grade_result,
+            "grade": grade_result.decision,
             "is_good_answer": getattr(grade_result, 'decision', False),
             "reasoning": getattr(grade_result, 'feedback', ''),
             "score": 1 if getattr(grade_result, 'decision', False) else 0
@@ -165,7 +174,7 @@ def rag_node(state: MainWorkflowState):
     }
 
 def router_node(state: MainWorkflowState):
-    router_result = run_router_agent(state["query"])
+    router_result = run_router_agent(state["query"], state.get("image_path"))
     return {
         "router_result": router_result,
         "current_mode": "tooling"
@@ -177,7 +186,7 @@ def agent_calls_node(state: MainWorkflowState):
     
     with ThreadPoolExecutor() as executor:
         futures = {
-            executor.submit(call_agent_simple, agent, state["query"]): agent 
+            executor.submit(call_agent_simple, agent, state["query"], state.get("image_path")): agent 
             for agent in agents
         }
         
@@ -216,6 +225,9 @@ def grading_node(state: MainWorkflowState):
     }
 
 def mode_decision_edge(state: MainWorkflowState):
+    if state.get("is_image_query", False):
+        return "end"
+    
     answer_grade = state["answer_grade"]
     current_mode = state["current_mode"]
     has_switched_mode = state.get("has_switched_mode", False)
@@ -259,7 +271,7 @@ def switch_to_rag_node(state: MainWorkflowState):
     }
 
 def switch_to_tooling_node(state: MainWorkflowState):
-    router_result = run_router_agent(state["query"])
+    router_result = run_router_agent(state["query"], state.get("image_path"))
     return {
         "router_result": router_result,
         "current_mode": "tooling",
@@ -275,6 +287,9 @@ def query_rewrite_node(state: MainWorkflowState):
     }
 
 def start_routing_edge(state: MainWorkflowState):
+    if state.get("is_image_query", False):
+        return "router"
+    
     initial_mode = state["initial_mode"]
     if initial_mode == "rag":
         return "rag"
@@ -320,9 +335,12 @@ def build_hybrid_workflow_graph():
 hybrid_workflow_graph = build_hybrid_workflow_graph()
 compiled_hybrid_graph = hybrid_workflow_graph.compile()
 
-def run_workflow(query: str, mode: str = "rag") -> Dict[str, Any]:
+def run_workflow(query: str, mode: str = "rag", image_path: str = None) -> Dict[str, Any]:
+    is_image_query = image_path is not None
+    
     state = MainWorkflowState(
         query=query,
+        image_path=image_path or "",
         initial_mode=mode,
         current_mode=mode,
         rag_response="",
@@ -336,7 +354,8 @@ def run_workflow(query: str, mode: str = "rag") -> Dict[str, Any]:
         generation="",
         extractions="",
         documents=[],
-        has_switched_mode=False
+        has_switched_mode=False,
+        is_image_query=is_image_query
     )
     
     if mode.lower() not in ["rag", "tooling"]:
@@ -349,22 +368,22 @@ def run_workflow(query: str, mode: str = "rag") -> Dict[str, Any]:
         "answer_quality_grade": final_state.get("answer_grade", {}),
         "is_answer_complete": final_state.get("answer_grade", {}).get("is_good_answer", False),
         "final_mode": final_state.get("current_mode", mode),
-        "switched_modes": final_state.get("has_switched_mode", False)
+        "switched_modes": final_state.get("has_switched_mode", False),
+        "is_image_query": final_state.get("is_image_query", False)
     }
 
 if __name__ == "__main__":
     import time
     questions = [
-        # "What are the best crops for Kharif season in Nashik and what is the weather forecast?",
-        # "Which fertilizer is recommended for rice in high rainfall regions?",
+        "Estimate crop yield for wheat in Punjab in winter of 2025",
         "How can farmers manage pest outbreaks in cotton fields?",
-        # "What are the latest government policies for agricultural credit?",
-        # "Suggest sustainable practices for improving soil health in Maharashtra.",
         "What is the market price trend for wheat in India?",
         "How to prevent fungal diseases in tomato crops?",
-        # "What irrigation methods are best for sugarcane?",
-        # "Which crops are suitable for drought-prone areas?",
-        # "How to increase yield for maize in semi-arid regions?"
+    ]
+    
+    image_queries = [
+        ("Analyze this crop disease", "Images/Crop/crop_disease.jpg"),
+        ("Check for pests in this image", "Images/Pests/jpg_0.jpg"),
     ]
     
     mode = input("Select initial mode (rag/tooling): ").strip().lower()
@@ -372,14 +391,23 @@ if __name__ == "__main__":
         print("Invalid mode. Using 'rag' as default.")
         mode = "rag"
     
-    for idx, user_query in enumerate(questions, 1):
+    query_type = input("Test type (text/image): ").strip().lower()
+    
+    if query_type == "image":
+        test_queries = image_queries
+    else:
+        test_queries = [(q, None) for q in questions]
+    
+    for idx, (user_query, image_path) in enumerate(test_queries, 1):
         print(f"\n{'='*80}")
         print(f"Question {idx}: {user_query}")
+        if image_path:
+            print(f"Image Path: {image_path}")
         print(f"Initial Mode: {mode.upper()}")
         print('='*80)
         
         start_time = time.time()
-        result = run_workflow(user_query, mode)
+        result = run_workflow(user_query, mode, image_path)
         end_time = time.time()
         
         print(f"Answer: {result['answer']}")
@@ -387,6 +415,7 @@ if __name__ == "__main__":
         print(f"  - Is Answer Complete: {result['is_answer_complete']}")
         print(f"  - Final Mode: {result['final_mode']}")
         print(f"  - Switched Modes: {result['switched_modes']}")
+        print(f"  - Is Image Query: {result['is_image_query']}")
         print(f"  - Processing Time: {end_time - start_time:.2f}s")
         
         if result['answer_quality_grade'].get('reasoning'):
