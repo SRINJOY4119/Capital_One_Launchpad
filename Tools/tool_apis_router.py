@@ -141,7 +141,7 @@ async def crop_recommendation(
     except Exception as e:
         return {"success": False, "error": str(e)}
 
-@router.post("/api/v1/weather/forecast")
+@router.post("/api/v1/weather/forecast-tool")
 async def weather_forecast(
     latitude: float,
     longitude: float
