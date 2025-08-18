@@ -22,6 +22,7 @@ from Agents.Crop_Recommender.routers import router as crop_recommender_router
 from Agents.Crop_Yield.routers import router as crop_yield_router
 from Agents.Location_Information.routers import router as location_information_router
 from Agents.News.routers import router as news_router
+from Agents.Fertilizer_Recommender.routers import router as fertilizer_recommender_router
 from Deep_Research.routers import router as deep_research_router
 from Tools.tool_apis_router import router as tool_apis_router
 
@@ -71,11 +72,11 @@ app.include_router(pest_prediction_router)
 app.include_router(crop_recommender_router)
 app.include_router(location_information_router)
 app.include_router(news_router)
+app.include_router(fertilizer_recommender_router)
 app.include_router(deep_research_router)
 app.include_router(crop_yield_router)
 app.include_router(tool_apis_router)
 
-# Health check endpoint for Docker
 @app.get("/health", tags=["Health"])
 async def health_check():
     """Health check endpoint for monitoring and Docker health checks"""

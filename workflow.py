@@ -25,6 +25,7 @@ from Agents.Risk_Management.agent import AgriculturalRiskAnalysisAgent
 from Agents.Web_Scrapping.agent import AgriculturalWebScrappingAgent
 from Agents.Crop_Yield.agent import CropYieldAssistant
 from Agents.Query_rewriter import QueryRewriterAgent
+from Agents.Fertilizer_Recommender.agent import FertilizerRecommendationAgent
 from utils.Internet_checker import InternetChecker
 from utils.hf_model import HFModel
 
@@ -57,6 +58,7 @@ pest_prediction_agent = PestPredictionAgent()
 risk_management_agent = AgriculturalRiskAnalysisAgent()
 web_scraping_agent = AgriculturalWebScrappingAgent()
 query_rewriter_agent = QueryRewriterAgent()
+fertilizer_recommender_agent = FertilizerRecommendationAgent()
 
 class MainWorkflowState(TypedDict):
     query: str
@@ -114,7 +116,7 @@ def call_agent(agent_name: str, query: str, image_path: str = None) -> Any:
     elif agent_name == "SynthesizerAgent":
         return synthesizer_agent.synthesize(query.get("responses", []))
     elif agent_name == "CropDiseaseDetectionAgent":
-        return crop_disease_agent.analyze_disease(query = "Analyze this crop image for disease symptoms", image_path=image_path)
+        return crop_disease_agent.analyze_disease(query = query, image_path=image_path)
     elif agent_name == "FactCheckerAgent":
         return fact_checker_agent.score(query)
     elif agent_name == "ImageAnalysisAgent":
@@ -131,6 +133,8 @@ def call_agent(agent_name: str, query: str, image_path: str = None) -> Any:
         return web_scraping_agent.scrape(query)
     elif agent_name == "CropYieldAgent":
         return crop_yield_assistant.respond(query)
+    elif agent_name == "FertilizerRecommenderAgent":
+        return fertilizer_recommender_agent.recommend_fertilizer(query)
     else:
         return f"No implementation for agent: {agent_name}"
 

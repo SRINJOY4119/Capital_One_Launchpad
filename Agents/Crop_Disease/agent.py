@@ -108,3 +108,11 @@ if __name__ == "__main__":
     print("Symptoms:", result.symptoms)
     print("Treatments:", result.Treatments)
     print("Prevention tips:", result.prevention_tips)
+
+    query = "What are the common diseases affecting wheat crops?"
+    result = agent.analyze_disease(query=query)
+    print("Disease names:", result.disease_name)
+    print("Disease probabilities:", result.disease_probability)
+    print("Symptoms:", result.symptoms)
+    print("Treatments:", result.Treatments)
+    print("Prevention tips:", result.prevention_tips)

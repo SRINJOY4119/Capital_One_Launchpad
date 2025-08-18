@@ -164,6 +164,16 @@ Output:
 }
   ]
 }
+
+Example 11 : 
+Query : "I need fertilizer for wheat in Punjab, soil test shows low nitrogen"
+Output:
+{
+  "agents": ["FertilizerRecommenderAgent"],
+  "justifications": [
+    "No image detected. FertilizerRecommenderAgent is selected to recommend fertilizers for wheat in Punjab based on soil test results."
+  ]
+}
 CRITICAL REMINDERS:
 - If ANY image is mentioned (file, photo, picture, visual content), route ONLY to image agents
 - Never combine image agents with non-image agents
