@@ -18,6 +18,7 @@ def get_google_weather_forecast(latitude: float, longitude: float) -> dict:
     }
 
     response = requests.get(API_URL, params=params)
+    print(response)
     if response.status_code != 200:
         return {"error": f"Failed to fetch data, status code: {response.status_code}", "response": response.json()}
 

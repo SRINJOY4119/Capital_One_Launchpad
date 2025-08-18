@@ -45,6 +45,51 @@ async def respond_query(request: AgricultureQueryRequest):
             processing_steps=None,
             error=f"Failed to process query: {str(e)}"
         )
+    
+@router.post("/translate", response_model=TranslationResponse)
+async def translate_text(request: TranslationRequest):
+    """
+    Translate text to the specified target language using the multilingual agent
+    """
+    try:
+        agent = get_agent()
+        print(request.source_lang)
+        print(request.target_lang)
+        # Use your agent's translation capability
+        translated_text = agent.translate_text(
+            text=request.text,
+            source_lang=getattr(request, 'source_language', 'auto'),
+            target_lang=request.target_lang
+        )
+        
+        # Check if translation failed (your agent returns error message in the string)
+        if translated_text.startswith("Translation failed:"):
+            return TranslationResponse(
+                success=False,
+                translated_text=None,
+                source_language=getattr(request, 'source_language', 'auto'),
+                target_language=request.target_lang,
+                error=translated_text
+            )
+        print(translated_text)
+
+        return TranslationResponse(
+            success=True,
+            translated_text=translated_text,
+            source_language=getattr(request, 'source_language', 'auto'),
+            target_language=request.target_lang,
+            error=None
+        )
+        
+    except Exception as e:
+        logger.error(f"Translation error: {str(e)}")
+        return TranslationResponse(
+            success=False,
+            translated_text=None,
+            source_language=getattr(request, 'source_language', 'auto'),
+            target_language=request.target_lang,
+            error=f"Translation failed: {str(e)}"
+        )
 
 
 
