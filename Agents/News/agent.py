@@ -3,8 +3,6 @@ import sys
 from agno.agent import Agent
 from agno.models.google import Gemini
 from dotenv import load_dotenv
-from agno.tools.newspaper import NewspaperTools
-from agno.tools.newspaper4k import Newspaper4kTools
 from agno.tools.tavily import TavilyTools
 from agno.tools.baidusearch import BaiduSearchTools
 from agno.tools.duckduckgo import DuckDuckGoTools

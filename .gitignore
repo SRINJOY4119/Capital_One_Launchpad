@@ -105,3 +105,4 @@ coverage.xml
 # Secrets and keys
 secrets/
 keys/
+ai_env/
