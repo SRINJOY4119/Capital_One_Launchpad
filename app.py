@@ -75,6 +75,27 @@ app.include_router(deep_research_router)
 app.include_router(crop_yield_router)
 app.include_router(tool_apis_router)
 
+# Health check endpoint for Docker
+@app.get("/health", tags=["Health"])
+async def health_check():
+    """Health check endpoint for monitoring and Docker health checks"""
+    return {
+        "status": "healthy",
+        "service": "Agricultural AI API",
+        "version": "1.0.0",
+        "timestamp": time.time()
+    }
+
+@app.get("/", tags=["Root"])
+async def root():
+    """Root endpoint with API information"""
+    return {
+        "message": "Agricultural AI API",
+        "version": "1.0.0",
+        "docs": "/docs",
+        "health": "/health"
+    }
+
 
 @app.post("/api/v1/workflow/process", response_model=WorkflowResponse, tags=["Hybrid Workflow"])
 async def process_workflow_query(request: WorkflowRequestNormalQuery):
