@@ -75,10 +75,14 @@ If you prefer to build and run the Docker container manually:
 
 ```bash
 # Build the Docker image
-docker build -t agricultural-ai .
+docker build -t pragati .
 
 # Run the container
-docker run -p 8000:8000 --env-file .env agricultural-ai
+docker run -p 8000:8000 \
+  --env-file .env \
+  -e GOOGLE_APPLICATION_CREDENTIALS=/app/google-creds.json \
+  -v $(pwd)/google-creds.json:/app/google-creds.json \
+  pragati
 ```
 
 ## 📡 API Endpoints
