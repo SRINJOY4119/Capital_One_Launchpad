@@ -1,37 +1,36 @@
-# PRAGATI - Agricultural AI Platform 🌾🤖
+# PRAGATI - Agricultural AI Platform
 
-**Precision Retrieval & AI for Generative Agriculture Technology & Insights**
+**Precision Retrieval and AI for Generative Agriculture Technology & Insights**
 
-A comprehensive RAG-powered multi-agent intelligence system tailored for agricultural domain knowledge. PRAGATI integrates semantic search with domain-specific knowledge base retrieval, ensuring all AI-generated responses are grounded in verified agricultural data.
+PRAGATI is an advanced multi-agent intelligence system designed for the agricultural sector. The platform leverages retrieval-augmented generation (RAG) and semantic search to deliver context-aware, data-driven insights grounded in verified agricultural knowledge bases.
 
-## 🌟 Key Features
+## Key Features
 
-- **🤖 Multi-Agent AI System** with specialized agents for different agricultural domains
-- **🔍 RAG-Powered Intelligence** for context-aware, grounded responses
-- **🌍 Multi-lingual & Multi-modal** support (text, image, voice inputs)
-- **🔬 Deep Research Pipelines** for enhanced coverage and analysis
-- **👥 Human-in-the-Loop (HITL)** mechanism for validation and trustworthiness
-- **📊 Real-time Market Intelligence** and weather forecasting
-- **🌱 Precision Agriculture** recommendations and insights
+- Multi-agent architecture with domain-specialized agents
+- Retrieval-augmented generation for accurate, context-sensitive responses
+- Multi-lingual and multi-modal support (text, image, voice)
+- Deep research pipelines for comprehensive analysis
+- Human-in-the-loop validation for reliability
+- Real-time market intelligence and weather forecasting
+- Precision agriculture recommendations and insights
 
-## 🚀 Quick Start with Docker
+## Quick Start
 
 ### Prerequisites
 
-- Docker installed on your system
-- Docker Compose (usually comes with Docker Desktop)
-- Git for cloning the repository
+- Docker (recommended)
+- Git
 
-### 1. Clone the Repository
+### Clone the Repository
 
 ```bash
 git clone https://github.com/SRINJOY59/Capital_One_Launchpad.git
 cd Capital_One_Launchpad
 ```
 
-### 2. Set Up Environment Variables
+### Environment Configuration
 
-Create a `.env` file in the root directory with your API keys:
+Create a `.env` file in the root directory and populate it with your API keys:
 
 ```bash
 cp .env.example .env
@@ -53,25 +52,7 @@ GOOGLE_WEATHER_API_KEY=your_google_weather_api_key_here
 GOOGLE_MAPS_API_KEY=your_google_maps_api_key_here
 ```
 
-### 3. Build and Run with Docker Compose
-
-```bash
-# Build and start the application
-docker-compose up --build
-
-# Or run in detached mode
-docker-compose up -d --build
-```
-
-### 4. Access the Application
-
-- **API Documentation**: http://localhost:8000/docs
-- **Health Check**: http://localhost:8000/health
-- **Root Endpoint**: http://localhost:8000/
-
-## 🛠️ Manual Docker Build (Alternative)
-
-If you prefer to build and run the Docker container manually:
+### Build and Run the Docker Container
 
 ```bash
 # Build the Docker image
@@ -79,39 +60,45 @@ docker build -t pragati .
 
 # Run the container
 docker run -p 8000:8000 \
-  --env-file .env \
-  -e GOOGLE_APPLICATION_CREDENTIALS=/app/google-creds.json \
-  -v $(pwd)/google-creds.json:/app/google-creds.json \
-  pragati
+   --env-file .env \
+   -e GOOGLE_APPLICATION_CREDENTIALS=/app/google-creds.json \
+   -v $(pwd)/google-creds.json:/app/google-creds.json \
+   pragati
 ```
 
-## 📡 API Endpoints
+### Access the Application
+
+- API Documentation: http://localhost:8000/docs
+- Health Check: http://localhost:8000/health
+- Root Endpoint: http://localhost:8000/
+
+## API Endpoints
 
 ### Core Features
 
-- **🌾 Crop Recommendations**: `/api/v1/crop-recommendation`
-- **🦠 Disease Detection**: `/api/v1/crop-disease/detect`
-- **🌤️ Weather Forecasting**: `/api/v1/weather/forecast-tool`
-- **📈 Market Prices**: `/api/v1/market-price`
-- **🔬 Pest Prediction**: `/api/v1/pest-prediction`
-- **🌱 Crop Yield Prediction**: `/api/v1/crop-yield/predict`
-- **💧 Fertilizer Recommendations**: `/api/v1/fertilizer/recommendation`
+- Crop Recommendations: `/api/v1/crop-recommendation`
+- Disease Detection: `/api/v1/crop-disease/detect`
+- Weather Forecasting: `/api/v1/weather/forecast-tool`
+- Market Prices: `/api/v1/market-price`
+- Pest Prediction: `/api/v1/pest-prediction`
+- Crop Yield Prediction: `/api/v1/crop-yield/predict`
+- Fertilizer Recommendations: `/api/v1/fertilizer/recommendation`
 
 ### AI Agents
 
-- **🌐 Multilingual Support**: `/api/v1/agent/multilingual`
-- **⚠️ Risk Management**: `/api/v1/agent/risk-management`
-- **📰 News Analysis**: `/api/v1/agent/agri-news`
-- **💰 Credit Policy & Market**: `/api/v1/agent/creditpolicy`
-- **🔍 Deep Research**: `/api/v1/agent/deep-research`
+- Multilingual Support: `/api/v1/agent/multilingual`
+- Risk Management: `/api/v1/agent/risk-management`
+- News Analysis: `/api/v1/agent/agri-news`
+- Credit Policy & Market: `/api/v1/agent/creditpolicy`
+- Deep Research: `/api/v1/agent/deep-research`
 
 ### Utilities
 
-- **🌍 Translation**: `/api/v1/translate/text`
-- **🕷️ Web Scraping**: `/api/v1/webscrapper/agri-prices`
-- **📍 Location Info**: `/api/v1/agent/location-information`
+- Translation: `/api/v1/translate/text`
+- Web Scraping: `/api/v1/webscrapper/agri-prices`
+- Location Info: `/api/v1/agent/location-information`
 
-## 🧪 Testing the API
+## Testing the API
 
 ### Health Check
 
@@ -144,13 +131,13 @@ curl -X POST "http://localhost:8000/api/v1/crop-disease/detect" \
 -F "file=@path/to/your/crop_image.jpg"
 ```
 
-## 🔧 Development Setup
+## Development Setup
 
 For local development without Docker:
 
 ### Prerequisites
 
-- Python 3.11+
+- Python 3.11 or higher
 - Virtual environment tool (venv, conda, etc.)
 
 ### Setup
@@ -171,7 +158,7 @@ cp .env.example .env
 uvicorn app:app --reload --host 0.0.0.0 --port 8000
 ```
 
-## 🏗️ Project Structure
+## Project Structure
 
 ```
 Capital_One_Launchpad/
@@ -191,41 +178,39 @@ Capital_One_Launchpad/
 ├── workflow.py                # Core workflow logic
 ├── requirements.txt           # Python dependencies
 ├── Dockerfile                 # Docker configuration
-├── docker-compose.yml         # Docker Compose configuration
 └── README.md                  # This file
 ```
 
-## 🚦 Monitoring & Health Checks
+## Monitoring & Health Checks
 
 The application includes built-in monitoring:
 
-- **Health Endpoint**: `/health` - Returns application status
-- **Docker Health Checks**: Automatic container health monitoring
-- **Logging**: Comprehensive logging for debugging and monitoring
+- Health Endpoint: `/health` - Returns application status
+- Docker Health Checks: Automatic container health monitoring
+- Logging: Comprehensive logging for debugging and monitoring
 
-## 🐛 Troubleshooting
+## Troubleshooting
 
 ### Common Issues
 
-1. **Port 8000 already in use**
+1. Port 8000 already in use
 
    ```bash
-   # Change port in docker-compose.yml or kill existing process
    lsof -i :8000
    kill -9 <PID>
    ```
 
-2. **API Key errors**
+2. API Key errors
 
-   - Verify all required API keys are set in `.env`
-   - Check API key validity and quotas
+   - Ensure all required API keys are set in `.env`
+   - Verify API key validity and quotas
 
-3. **Model loading issues**
+3. Model loading issues
 
    - Ensure sufficient memory (8GB+ recommended)
    - Check internet connection for model downloads
 
-4. **Docker build fails**
+4. Docker build fails
    - Clear Docker cache: `docker system prune -a`
    - Ensure sufficient disk space
 
@@ -233,52 +218,50 @@ The application includes built-in monitoring:
 
 ```bash
 # View application logs
-docker-compose logs -f agricultural-ai
-
-# View specific service logs
-docker logs agricultural-ai-app
+docker logs <container_name>
 ```
 
-## 🏛️ PRAGATI Architecture
+## PRAGATI Architecture
 
 ### RAG-Powered Intelligence
 
-- **Semantic Search**: Advanced retrieval from agricultural knowledge bases
-- **Query Complexity Assessment**: Optimized retrieval and generation
-- **Domain-Specific Knowledge**: Grounded in verified agricultural data
+- Semantic search for advanced retrieval from agricultural knowledge bases
+- Query complexity assessment for optimized retrieval and generation
+- Domain-specific knowledge grounded in verified agricultural data
 
 ### Multi-Agent Orchestration
 
-- **Specialized Agents**: Crop selection, irrigation, fertilizer, pest detection
-- **Weather Forecasting**: Real-time meteorological analysis
-- **Market Analysis**: Price trends and supply chain insights
-- **Risk Assessment**: Agricultural decision support
+- Specialized agents for crop selection, irrigation, fertilizer, and pest detection
+- Weather forecasting with real-time meteorological analysis
+- Market analysis for price trends and supply chain insights
+- Risk assessment for agricultural decision support
 
 ### Multi-Modal Capabilities
 
-- **Text Processing**: Natural language queries and responses
-- **Image Analysis**: Crop disease detection and visual diagnostics
-- **Voice Input**: Accessibility for diverse user base
+- Text processing for natural language queries and responses
+- Image analysis for crop disease detection and visual diagnostics
+- Voice input for accessibility
 
-## 🤝 Contributing
+## Contributing
 
 1. Fork the repository
 2. Create a feature branch
-3. Make your changes
+3. Implement your changes
 4. Test thoroughly
 5. Submit a pull request
 
-## 📄 License
+## License
 
-This project is licensed under the MIT License - see the LICENSE file for details.
+This project is licensed under the MIT License. See the LICENSE file for details.
 
-## 🙏 Acknowledgments
+## Acknowledgments
 
 - Agricultural research institutions for datasets
-- Open source ML community
-- FastAPI and modern Python ecosystem
+- Open source machine learning community
+- FastAPI and the modern Python ecosystem
 - Capital One Launchpad Program
 
 ---
 
-**Made with ❤️ for sustainable agriculture and AI innovation**
+**Developed for sustainable agriculture and AI innovation.**
+
