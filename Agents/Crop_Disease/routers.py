@@ -34,8 +34,8 @@ async def detect_disease(
         
         result = agent.analyze_disease(query=query, image_path=temp_path)
         
-        disease_name = result.disease_name if result.disease_name else []
-        disease_probability = result.disease_probability if result.disease_probability else []
+        diseases = result.diseases if result.diseases else []
+        disease_probabilities = result.disease_probabilities if result.disease_probabilities else []
         symptoms = result.symptoms if result.symptoms else []
         treatments = result.Treatments if result.Treatments else []
         prevention_tips = result.prevention_tips if result.prevention_tips else []
@@ -45,8 +45,8 @@ async def detect_disease(
         
         return CropDiseaseDetectionResponse(
             success=True,
-            diseases=disease_name,
-            disease_probabilities=disease_probability,
+            diseases=diseases,
+            disease_probabilities=disease_probabilities,
             symptoms=symptoms,
             Treatments=treatments,
             prevention_tips=prevention_tips,

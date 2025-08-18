@@ -21,11 +21,11 @@ load_dotenv()
 
 
 class CropDiseaseOutput(BaseModel):
-    disease_name: Optional[list[str]] = []
-    disease_probability: Optional[list[float]] = []
-    symptoms: Optional[list[str]] = []
-    Treatments: Optional[list[str]] = []
-    prevention_tips: Optional[list[str]] = []
+    diseases: list[str] = []
+    disease_probabilities: list[float] = []
+    symptoms: list[str] = []
+    Treatments: list[str] = []
+    prevention_tips: list[str] = []
 
 class CropDiseaseAgent:
     def __init__(self, model_id="gemini-2.0-flash"):
@@ -41,24 +41,32 @@ class CropDiseaseAgent:
             instructions="""
 You are an advanced crop disease analysis agent. Your task is to analyze crop images for disease symptoms and provide a clear diagnosis and actionable recommendations.
 
-IMPORTANT: You MUST return a valid JSON response that matches the CropDiseaseOutput schema exactly.
+CRITICAL: You MUST return EXACTLY this JSON structure:
+{
+    "diseases": ["Disease1", "Disease2", "Disease3"],
+    "disease_probabilities": [0.85, 0.70, 0.60],
+    "symptoms": ["symptom1", "symptom2", "symptom3"],
+    "Treatments": ["treatment1", "treatment2", "treatment3"],
+    "prevention_tips": ["tip1", "tip2", "tip3"]
+}
 
-If image is provided, analyze it and provide:
-- disease_name: List of top 3 disease names (strings)
-- disease_probability: List of probabilities as decimals (e.g., 0.85 for 85%)
-- symptoms: List of observed symptoms
-- Treatments: List of treatment recommendations  
-- prevention_tips: List of prevention tips (max 10 words each)
+RULES:
+1. ALWAYS provide at least 3 items in each list
+2. disease_probabilities should be decimals between 0.0 and 1.0
+3. If no image provided, use general crop disease information
+4. Each prevention tip should be maximum 10 words
+5. Make treatments specific and actionable
 
-If no image is provided, set disease_name and disease_probability to empty lists, but still provide symptoms, treatments, and prevention_tips based on the query context.
+EXAMPLE OUTPUT FOR HEALTHY CROP:
+{
+    "diseases": ["Healthy", "No disease detected", "Normal growth"],
+    "disease_probabilities": [0.95, 0.90, 0.85],
+    "symptoms": ["Green healthy leaves", "Normal growth pattern", "No visible damage"],
+    "Treatments": ["Continue regular care", "Monitor for changes", "Maintain current practices"],
+    "prevention_tips": ["Regular watering schedule", "Balanced fertilization program", "Pest monitoring routine"]
+}
 
-
-PROMPTING STRATEGY:
-- When an image is provided, first attempt to identify the disease using your own analysis.
-- If the crop_disease_detection tool is called and returns a result, present the top 3 most probable diseases with their probabilities.
-- Use TavilyTools to search for current weather and disease outbreak information for the location or crop mentioned.
-- Always justify your diagnosis and recommendations with reference to visible symptoms, crop type, agricultural context, and current weather.
-- Include actionable steps for disease management, prevention, and follow-up monitoring.
+When analyzing, use the crop_disease_detection tool if an image is provided, then supplement with your knowledge and TavilyTools for additional context.
 """
         )
 
@@ -69,7 +77,7 @@ PROMPTING STRATEGY:
             prompt = f"Analyze this crop image for disease symptoms and provide diagnosis with structured output: {query}"
             result = self.agent.run(prompt, images=[image])
         else:
-            prompt = f"No image provided. Analyze based on context only. Set disease_name and disease_probability to empty lists, but provide symptoms, treatments, and prevention tips for: {query}"
+            prompt = f"No image provided. Analyze based on context only. Set diseases and disease_probabilities to empty lists, but provide symptoms, treatments, and prevention tips for: {query}"
             result = self.agent.run(prompt)
         
         # Check if result has content attribute
@@ -78,21 +86,21 @@ PROMPTING STRATEGY:
         else:
             response = result
             
-        print(f"Agent CropDiseaseDetectionAgent Response: {response}")
+        #print(f"Agent CropDiseaseDetectionAgent Response: {response}")
         
         # Validate the response has the required fields
-        if (hasattr(response, "disease_name") and hasattr(response, "disease_probability") and 
+        if (hasattr(response, "diseases") and hasattr(response, "disease_probabilities") and 
             hasattr(response, "symptoms") and hasattr(response, "Treatments") and 
             hasattr(response, "prevention_tips")):
             
             # Check if all critical fields are None/empty
-            if (not response.disease_name and not response.disease_probability and 
+            if (not response.diseases and not response.disease_probabilities and 
                 not response.symptoms and not response.Treatments and not response.prevention_tips):
                 print("Warning: All outputs are empty. Creating default response.")
                 # Create a default response
                 response = CropDiseaseOutput(
-                    disease_name=["Unable to determine"],
-                    disease_probability=[0.0],
+                    diseases=["Unable to determine"],
+                    disease_probabilities=[0.0],
                     symptoms=["Image analysis failed"],
                     Treatments=["Consult local agricultural expert"],
                     prevention_tips=["Regular crop monitoring recommended"]
@@ -102,9 +110,14 @@ PROMPTING STRATEGY:
 
 if __name__ == "__main__":
     agent = CropDiseaseAgent()
-    result = agent.analyze_disease(query="describe the diseases", image_path="../../Images/Crop/crop_disease.jpg")
-    print("Disease names:", result.disease_name)
-    print("Disease probabilities:", result.disease_probability)
+    # Use absolute path to ensure image is found
+    image_path = os.path.join(project_root, "uploads", "Screenshot 2025-08-16 at 12.22.35 PM.png")
+    print(f"Looking for image at: {image_path}")
+    print(f"Image exists: {os.path.exists(image_path)}")
+    
+    result = agent.analyze_disease(query="analyze this crop for diseases", image_path=image_path)
+    print("Diseases:", result.diseases)
+    print("Disease probabilities:", result.disease_probabilities)
     print("Symptoms:", result.symptoms)
     print("Treatments:", result.Treatments)
     print("Prevention tips:", result.prevention_tips)
