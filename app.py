@@ -7,6 +7,7 @@ import uvicorn
 import os
 import tempfile
 import time
+import json
 from pathlib import Path
 
 from Agents.Multi_Lingual.routers import router as multilingual_router
@@ -69,6 +70,24 @@ app.include_router(deep_research_router)
 app.include_router(crop_yield_router)
 app.include_router(tool_apis_router)
 
+def serialize_agent_responses(responses: Dict[str, Any]) -> Dict[str, Any]:
+    serialized = {}
+    for agent_name, response in responses.items():
+        try:
+            json.dumps(response)
+            serialized[agent_name] = response
+        except (TypeError, ValueError):
+            if hasattr(response, '__dict__'):
+                serialized[agent_name] = response.__dict__
+            elif hasattr(response, 'dict'):
+                try:
+                    serialized[agent_name] = response.dict()
+                except:
+                    serialized[agent_name] = str(response)
+            else:
+                serialized[agent_name] = str(response)
+    return serialized
+
 @app.get("/health", tags=["Health"])
 async def health_check():
     return {
@@ -99,6 +118,7 @@ async def process_workflow_query(request: WorkflowRequestNormalQuery):
         processing_time = end_time - start_time
 
         result["processing_time"] = processing_time
+        result["agent_responses"] = serialize_agent_responses(result.get("agent_responses", {}))
 
         return WorkflowResponse(**result)
 
@@ -150,6 +170,7 @@ async def process_workflow_with_image(
                 print(f"Warning: Could not clean up temp file: {cleanup_err}")
 
         result["processing_time"] = processing_time
+        result["agent_responses"] = serialize_agent_responses(result.get("agent_responses", {}))
 
         return JSONResponse(content=result)
 
@@ -157,15 +178,15 @@ async def process_workflow_with_image(
         if temp_file_path and os.path.exists(temp_file_path):
             try:
                 os.unlink(temp_file_path)
-            except Exception as cleanup_err:
-                print(f"Warning: Could not clean up temp file: {cleanup_err}")
+            except Exception:
+                pass
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         if temp_file_path and os.path.exists(temp_file_path):
             try:
                 os.unlink(temp_file_path)
-            except Exception as cleanup_err:
-                print(f"Warning: Could not clean up temp file: {cleanup_err}")
+            except Exception:
+                pass
         raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
 
 @app.get("/")

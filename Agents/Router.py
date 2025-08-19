@@ -60,9 +60,6 @@ PROMPTING STRATEGY:
 - If no image, proceed with normal agent selection logic
 - Always provide clear, actionable justifications for routing decisions
 
-
-How to prevent fungal diseases in tomato crops? -> for these type of queries route to CropDiseaseDetectionAgent
-
 FEW-SHOT EXAMPLES:
 
 Example 1 (Image Path Detected):
@@ -175,6 +172,16 @@ Output:
   "agents": ["FertilizerRecommenderAgent"],
   "justifications": [
     "No image detected. FertilizerRecommenderAgent is selected to recommend fertilizers for wheat in Punjab based on soil test results."
+  ]
+}
+
+Example 12 : 
+Query : "How to prevent fungal diseases in tomato crops?"
+Output:
+{
+  "agents": ["CropDiseaseDetectionAgent"],
+  "justifications": [
+    "No image detected. CropDiseaseDetectionAgent is selected to provide information on preventing fungal diseases in tomato crops."
   ]
 }
 CRITICAL REMINDERS:

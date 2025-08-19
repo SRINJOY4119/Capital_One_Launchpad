@@ -75,6 +75,8 @@ IMPORTANT: You MUST ONLY use your available tool(s) and your knowledge for analy
             response = result.content
         else:
             response = result
+        
+        print(f"Agent response: {response}")
             
         #print(f"Agent CropDiseaseDetectionAgent Response: {response}")
         

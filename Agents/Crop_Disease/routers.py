@@ -33,6 +33,7 @@ async def detect_disease(
                 shutil.copyfileobj(image.file, buffer)
         
         result = agent.analyze_disease(query=query, image_path=temp_path)
+        print(result)
         
         diseases = result.diseases if result.diseases else []
         disease_probabilities = result.disease_probabilities if result.disease_probabilities else []
