@@ -7,15 +7,6 @@ from agno.models.google import Gemini
 from dotenv import load_dotenv
 from pydantic import BaseModel
 from typing import Optional
-
-current_dir = os.path.dirname(os.path.abspath(__file__))
-parent_dir = os.path.dirname(current_dir)
-project_root = os.path.dirname(parent_dir)
-
-sys.path.append(parent_dir)
-sys.path.append(project_root)
-
-from Tools.crop_disease_detection import detect_crop_disease
 from agno.tools.tavily import TavilyTools
 load_dotenv()
 
@@ -36,7 +27,7 @@ class CropDiseaseAgent:
             show_tool_calls=True,
             add_history_to_messages=True,
             num_history_responses=5,
-            tools=[detect_crop_disease, TavilyTools()],
+            tools=[TavilyTools()],
             response_model=CropDiseaseOutput,
             instructions="""
 You are an advanced crop disease analysis agent. Your task is to analyze crop images for disease symptoms and provide a clear diagnosis and actionable recommendations.
@@ -66,7 +57,7 @@ EXAMPLE OUTPUT FOR HEALTHY CROP:
     "prevention_tips": ["Regular watering schedule", "Balanced fertilization program", "Pest monitoring routine"]
 }
 
-When analyzing, use the crop_disease_detection tool if an image is provided, then supplement with your knowledge and TavilyTools for additional context.
+IMPORTANT: You MUST ONLY use your available tool(s) and your knowledge for analysis.
 """
         )
 
@@ -80,7 +71,6 @@ When analyzing, use the crop_disease_detection tool if an image is provided, the
             prompt = f"No image provided. Analyze based on context only. Set diseases and disease_probabilities to empty lists, but provide symptoms, treatments, and prevention tips for: {query}"
             result = self.agent.run(prompt)
         
-        # Check if result has content attribute
         if hasattr(result, 'content'):
             response = result.content
         else:

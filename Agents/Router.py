@@ -60,6 +60,9 @@ PROMPTING STRATEGY:
 - If no image, proceed with normal agent selection logic
 - Always provide clear, actionable justifications for routing decisions
 
+
+How to prevent fungal diseases in tomato crops? -> for these type of queries route to CropDiseaseDetectionAgent
+
 FEW-SHOT EXAMPLES:
 
 Example 1 (Image Path Detected):
